@@ -116,7 +116,7 @@ def defineRegionParameters(samples):
     return [mean_x0, stdev_x0], [mean_x1, stdev_x1]
 
 
-def propagateUncertaintyOneStep(regions, signatures, probas, cov_noise, method, params):
+def propagateUncertaintyOneStep(desired_region_size, regions, signatures, probas, cov_noise, method, params):
 
     #Propagate signature points (signatures are fixed)
     #Later we can think about moving the signature points each time, so this will have to be adapted
@@ -130,7 +130,7 @@ def propagateUncertaintyOneStep(regions, signatures, probas, cov_noise, method, 
     params_x0, params_x1 = defineRegionParameters(samples)
 
 
-    n_signatures = math.floor(6*params_x0[1]/0.05) #proxy
+    n_signatures = math.floor(6*params_x0[1]/desired_region_size) #proxy
     print(n_signatures)
 
     #regions = createRegions([params_x0[0] - 3*params_x0[1], params_x0[0] + 3*params_x0[1]], [params_x1[0] - 3*params_x1[1], params_x1[0] + 3*params_x1[1]], math.floor(math.sqrt(len(signatures)))-1)
