@@ -1,7 +1,6 @@
 import numpy as np
-from scipy import special
- 
 import multiprocessing
+from scipy import special
 from functools import partial
  
 from time import time
@@ -35,8 +34,8 @@ def gaussianProbaMassInsideHypercube(means, var, cube):
     # Assuming cube = [x_lower, x_upper] where each is an n-dimensional vector
     # Assume mean and var are n-dimensional vectors
  
-    #factor = 1/(2**means.shape[-1])
-    factor = 1/4
+    factor = 1/(2**means.shape[-1])
+    #factor = 1/4
     # erf_factor works vectors (all the functions take vectors as input)
     # It also works if mean or var are scalar while min and max 
     # are vectors. See more about broadcast semantics here:
