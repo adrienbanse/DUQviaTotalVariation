@@ -116,6 +116,32 @@ def defineRegionParameters(samples):
     return [mean_x0, stdev_x0], [mean_x1, stdev_x1]
 
 
+def defineNumberOfSignatures(coverage, st_dev, desired_region_size):
+    return math.floor(coverage*st_dev/desired_region_size)
+
+
+def updateGrid(desired_region_size, regions, signatures, probas, cov_noise, method, params):
+
+    #Propagate signature points (signatures are fixed)
+    #Later we can think about moving the signature points each time, so this will have to be adapted
+    #propagated_signatures = propagateSignatures(signatures)
+
+    #This has to come before the definition of the new signatures!!!! Nice :)
+    #means_gmm = propagateSignatures(signatures, method, params)
+
+    samples = sampleFromGMM(1000, probas, signatures, cov_noise, method, params)
+        
+    params_x0, params_x1 = defineRegionParameters(samples)
+
+    n_signatures = defineNumberOfSignatures(8, max(params_x0[1], params_x1[1]), desired_region_size)
+
+    #regions = grid.createRegions([params_x0[0], params_x0[1]], [params_x1[0], params_x1[1]], 4, n_signatures)
+    regions = grid.createRegionsAlternative([params_x0[0], params_x0[1]], [params_x1[0], params_x1[1]], [120, 90, 40, 20, 10])
+    signatures = grid.placeSignatures(regions, 0.5)
+
+    return signatures, regions
+
+
 def propagateUncertaintyOneStep(desired_region_size, regions, signatures, probas, cov_noise, method, params):
 
     #Propagate signature points (signatures are fixed)
@@ -123,23 +149,20 @@ def propagateUncertaintyOneStep(desired_region_size, regions, signatures, probas
     #propagated_signatures = propagateSignatures(signatures)
 
     #This has to come before the definition of the new signatures!!!! Nice :)
-    means_gmm = propagateSignatures(signatures, method, params) #OR SHOULD IT BE JUST SIGNATURES?
+    means_gmm = propagateSignatures(signatures, method, params)
 
     samples = sampleFromGMM(1000, probas, signatures, cov_noise, method, params)
         
     params_x0, params_x1 = defineRegionParameters(samples)
 
+    n_signatures = defineNumberOfSignatures(6, params_x0[1], desired_region_size)
 
-    n_signatures = math.floor(6*params_x0[1]/desired_region_size) #proxy
-    print(n_signatures)
-
-    #regions = createRegions([params_x0[0] - 3*params_x0[1], params_x0[0] + 3*params_x0[1]], [params_x1[0] - 3*params_x1[1], params_x1[0] + 3*params_x1[1]], math.floor(math.sqrt(len(signatures)))-1)
-    regions = grid.createRegions([params_x0[0] - 4*params_x0[1], params_x0[0] + 4*params_x0[1]], [params_x1[0] - 4*params_x1[1], params_x1[0] + 4*params_x1[1]], n_signatures)
+    regions = grid.createRegions([params_x0[0], params_x0[1]], [params_x1[0], params_x1[1]], 4, n_signatures)
     signatures = grid.placeSignatures(regions, 0.5)
 
     #means_gmm = signatures
 
     #means_gmm = propagateMeans(means_gmm)
-    probas = proba.computeSignatureProbabilities(regions, means_gmm, cov_noise, probas) 
+    probas = proba.computeSignatureProbabilitiesInParallel(regions, means_gmm, cov_noise, probas) 
 
     return probas, signatures, regions

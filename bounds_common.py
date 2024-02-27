@@ -33,8 +33,6 @@ def verifyIfRegionIsBounded(region):
 
 def computeUpperBoundForTV(signatures, regions, gmm, cov_noise, method, params):
 
-    #prob_check = 0
-
     tv = 0
     for signature, region in zip(signatures, regions):
         
@@ -44,24 +42,47 @@ def computeUpperBoundForTV(signatures, regions, gmm, cov_noise, method, params):
         if verifyIfRegionIsBounded(region):
             if method == 'linear':
                 A = params[0]
-                max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, cov_noise))/(2*sqrt(2))
+                max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, cov_noise)/(2*sqrt(2)))
 
             elif method == 'polynomial':
                 h = params[0]
-                max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, cov_noise))/(2*sqrt(2))
+                max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, cov_noise)/(2*sqrt(2)))
         else:
             max_value = 1
 
         
-        #print(max_value)
-        for (weight, gmm_mean) in zip(gmm[0], gmm[1]):
-            prob_gmm_region += weight*proba.gaussianProbaMassInsideHypercube(gmm_mean, gmm[2], region)
-
-        #prob_check += prob_gmm_region
+        prob_gmm_region = proba.gmmProbaMassInsideHypercube(gmm, region)
 
         tv += max_value*prob_gmm_region
 
+    return tv
 
-    #print(prob_check)
+
+
+def computeUpperBoundForTVWithMax(signatures, regions, probas, cov_noise, method, params):
+
+
+    tv = 0
+
+    for cont, (signature, region) in enumerate(zip(signatures, regions)):
+        
+        max_value = 0
+        prob_gmm_region = 0
+
+        if verifyIfRegionIsBounded(region):
+            if method == 'linear':
+                A = params[0]
+                max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, cov_noise)/(2*sqrt(2)))
+
+            elif method == 'polynomial':
+                h = params[0]
+                max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, cov_noise)/(2*sqrt(2)))
+        else:
+            max_value = 1
+
+        
+        prob_gmm_region = probas[cont]
+
+        tv += max_value*prob_gmm_region
 
     return tv

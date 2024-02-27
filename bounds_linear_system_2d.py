@@ -26,12 +26,16 @@ def insideSumTerm(A, x, signature, cov_noise, i):
 
 def maxValueInsideRegion(A, signature, region, cov_noise):
 
-    max_value_0, max_value_1 = 0, 0
+    #max_value_0, max_value_1 = 0, 0
+    max_value = 0
 
     vertices = grid.getVertices(region)
     
     for vertice in vertices:
-        max_value_0 = max(max_value_0, insideSumTerm(A, vertice, signature, cov_noise, 0))
-        max_value_1 = max(max_value_1, insideSumTerm(A, vertice, signature, cov_noise, 1))
+        #max_value_0 = max(max_value_0, insideSumTerm(A, vertice, signature, cov_noise, 0))
+        #max_value_1 = max(max_value_1, insideSumTerm(A, vertice, signature, cov_noise, 1))
 
-    return max_value_0 + max_value_1
+        max_value = max(max_value, sqrt(insideSumTerm(A, vertice, signature, cov_noise, 0)**2 + insideSumTerm(A, vertice, signature, cov_noise, 1)**2))
+
+    return max_value
+    #return max_value_0 + max_value_1

@@ -1,8 +1,9 @@
 import propagation_methods as propag
-import pandas as pd
 
+import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from matplotlib.patches import Rectangle
 
 
 def extractStateCoordinate(states, i):
@@ -26,9 +27,9 @@ def plot_signatures(signatures, regions, plot_bounds):
     ax.set_ylim(plot_bounds[0], plot_bounds[1])
     ax.set(xlabel='State[0]', ylabel='State[1]')
 
-    for region in regions:
-        ax.hlines(region[1], -15, 15, linewidth=0.5, color="gray")
-        ax.vlines(region[0], -15, 15, linewidth=0.5, color="gray")
+    # for region in regions:
+    #     ax.hlines(region[1], -15, 15, linewidth=0.5, color="gray")
+    #     ax.vlines(region[0], -15, 15, linewidth=0.5, color="gray")
 
 
 
@@ -54,6 +55,42 @@ def plotSystemPropagation(initial_states, final_states, n_steps_ahead):
     ax.set_xlim(-3, 3)
     ax.set_ylim(-3, 3)
     ax.set(xlabel='State[0]', ylabel='State[1]')
+
+
+def plotPropagationStepByStep(df, barrier):
+    
+    fig, ax = plt.subplots()
+
+    rect1 = Rectangle((barrier[0][0], barrier[1][0]), barrier[0][1] - barrier[0][0], barrier[1][1] - barrier[1][0], 
+                    edgecolor = 'red', facecolor = 'lightcoral', fill=True, lw=1, alpha=0.7, label = 'Unsafe set')
+
+    ax.add_patch(rect1)
+
+    # Create the scatter plot with hist2d
+    #plt.figure(figsize=(8, 6))
+
+    colors = ['Blues', 'BuPu', 'PuRd', 'Greens', 'Oranges', 'Reds', 'Greys', 'Purples',
+            'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu',
+            'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
+
+    for t in range(len(df.columns)):
+        states = df.iloc[:, t]
+
+        # Plot using hist2d with color intensity indicating the density
+        plt.hist2d([state[0] for state in states], [state[1] for state in states], bins=100, cmap=colors[t], alpha=0.8, cmin=0.1)
+
+    # cb = plt.colorbar(label='Point Density')
+    plt.legend(loc='lower right')
+
+    # Add a colorbar
+    #plt.colorbar(label='Point Density')
+
+    #plt.title('Monte Carlo Simulation')
+    plt.xlabel('State[0]')
+    plt.ylabel('State[1]')
+    plt.grid(True)
+    plt.axis('equal')
+    plt.show()
 
 
 def plotSamplesFromGMM(samples):
