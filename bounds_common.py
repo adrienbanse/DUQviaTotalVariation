@@ -5,6 +5,14 @@ import bounds_polynomial_system_2d as bounds_polynomial
 import numpy as np
 from scipy import special
 
+
+def print_bound(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        print(f"TV bound at propag step: {result}")
+        return result
+    return wrapper
+
 # ----------------------------------------------------------------------------------------- #
 # ------------------------------ Auxiliary computing methods ------------------------------ #
 # ----------------------------------------------------------------------------------------- #
@@ -22,45 +30,17 @@ def erf(x):
 
 
 def verifyIfRegionIsBounded(region):
-    if np.isinf(region[0][0]) or np.isinf(region[0][1]) or np.isinf(region[1][0]) or np.isinf(region[1][1]):
-        return False
-    return True
+    
+    is_inf = np.logical_or(np.isinf(region[0]), np.isinf(region[1]))
+    return not np.any(is_inf)
 
 
 # ----------------------------------------------------------------------------------------- #
-# -------------------------- Measure of Sqrt[KL divergence] - ALTERNATIVE ------------------------------- #
+# ------------------- TV upper bound (using the maximization approach) -------------------- #
 # ----------------------------------------------------------------------------------------- #
 
-def computeUpperBoundForTV(signatures, regions, gmm, cov_noise, method, params):
-
-    tv = 0
-    for signature, region in zip(signatures, regions):
-        
-        max_value = 0
-        prob_gmm_region = 0
-
-        if verifyIfRegionIsBounded(region):
-            if method == 'linear':
-                A = params[0]
-                max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, cov_noise)/(2*sqrt(2)))
-
-            elif method == 'polynomial':
-                h = params[0]
-                max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, cov_noise)/(2*sqrt(2)))
-        else:
-            max_value = 1
-
-        
-        prob_gmm_region = proba.gmmProbaMassInsideHypercube(gmm, region)
-
-        tv += max_value*prob_gmm_region
-
-    return tv
-
-
-
-def computeUpperBoundForTVWithMax(signatures, regions, probas, cov_noise, method, params):
-
+@print_bound
+def computeUpperBoundForTVWithMax(signatures, regions, probas, var_noise, method, params):
 
     tv = 0
 
@@ -72,11 +52,11 @@ def computeUpperBoundForTVWithMax(signatures, regions, probas, cov_noise, method
         if verifyIfRegionIsBounded(region):
             if method == 'linear':
                 A = params[0]
-                max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, cov_noise)/(2*sqrt(2)))
+                max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, var_noise)/(2*sqrt(2)))
 
             elif method == 'polynomial':
                 h = params[0]
-                max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, cov_noise)/(2*sqrt(2)))
+                max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, var_noise)/(2*sqrt(2)))
         else:
             max_value = 1
 

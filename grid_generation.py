@@ -2,288 +2,193 @@ import numpy as np
 import math
 from scipy.stats import norm
 
+import propagation_methods as propag
+
+def print_array_size(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        print(f"Number of signatures: {len(result)}")
+        return result
+    return wrapper
+
 # ----------------------------------------------------------------------------------------- #
 # ---------------------------------- Grid generation -------------------------------------- #
 # ----------------------------------------------------------------------------------------- #
-
-def non_linear_spacing_gaussian(start, stop, num_points, mean, std_dev):
-    """
-    Generate non-linearly spaced samples using a Gaussian density as reference.
-
-    Parameters:
-        start (float): The starting value of the sequence.
-        stop (float): The end value of the sequence.
-        num_points (int): Number of samples to generate.
-        mean (float): The mean of the Gaussian distribution.
-        std_dev (float): The standard deviation of the Gaussian distribution.
-
-    Returns:
-        array: A 1-D array containing the non-linearly spaced samples.
-    """
-    # Generate Gaussian PDF
-    x = np.linspace(start, stop, num_points)
-    pdf = norm.pdf(x, mean, 2*std_dev)
-
-    # Adjust spacing using Gaussian PDF
-    spacing = 1 / pdf
-    spacing /= np.max(spacing)
-    cum_spacing = np.cumsum(spacing)
-    cum_spacing /= np.max(cum_spacing)
-    samples = start + (stop - start) * cum_spacing
-
-    samples = np.append(samples, start) #Need to add the start value to guarantee the symmetry
-    samples = np.sort(samples)
-
-    return samples
-
-def getStartStop(mean, std_dev, sigma_factor):
-    
-    start = mean - sigma_factor*std_dev
-    stop = mean + sigma_factor*std_dev
-
-    return start, stop
-
-
-def generateIntervalsPerAxis(distrib_params, sigma_factor, n_partitions):
-
-    mean = distrib_params[0]
-    std_dev = distrib_params[1]
-
-    start, stop = getStartStop(mean, std_dev, sigma_factor)
-
-    points = non_linear_spacing_gaussian(start, stop, n_partitions, mean, std_dev)
-
-    #points = np.append(points, -np.inf)
-    #points = np.append(points, np.inf)
-    #points = np.sort(points)
-
-    return points
 
 def generateEquallySpacedIntervalsPerAxis(start, stop, n_partitions):
 
     return np.linspace(start, stop, n_partitions)
 
 
-def createBoundedRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
-    
-    x_points = generateIntervalsPerAxis(distrib_params_1, sigma_factor, n_partitions)
-    y_points = generateIntervalsPerAxis(distrib_params_2, sigma_factor, n_partitions)
+def generateUnequallyLinearSpacedIntervalsPerAxis(start, stop, n_partitions):
 
+    sigma = (stop - start)/8
+
+    mark1 = start + 1*sigma
+    mark2 = start + 2*sigma
+    mark3 = start + 3*sigma
+    mark5 = start + 5*sigma
+    mark6 = start + 6*sigma
+    mark7 = start + 7*sigma
+
+    # x1 = np.linspace(start, mark1, int(np.ceil(0.1*n_partitions)))
+    # x2 = np.linspace(mark1, mark2, int(np.ceil(0.1*n_partitions)))
+    # x3 = np.linspace(mark2, mark3, int(np.ceil(0.2*n_partitions)))
+    # x4 = np.linspace(mark3, mark5, int(np.ceil(0.6*n_partitions))) #center
+    # x5 = np.linspace(mark5, mark6, int(np.ceil(0.2*n_partitions)))
+    # x6 = np.linspace(mark6, mark7, int(np.ceil(0.1*n_partitions)))
+    # x7 = np.linspace(mark7, stop, int(np.ceil(0.1*n_partitions)))
+
+    x1 = np.linspace(start, mark1, 5)
+    x2 = np.linspace(mark1, mark2, 15)
+    x3 = np.linspace(mark2, mark3, 40)
+    x4 = np.linspace(mark3, mark5, 110) #center
+    x5 = np.linspace(mark5, mark6, 40)
+    x6 = np.linspace(mark6, mark7, 15)
+    x7 = np.linspace(mark7, stop, 5)
+
+    #TODO: maybe latter set a minimum nb of signatures in each partition to 2, so both starts and ends are taken into account
+
+    return np.concatenate((x1, x2, x3, x4, x5, x6, x7))
+
+
+
+def generate_regions(*lists):
+    if len(lists) == 0:
+        return []
+
+    # Get the lengths of each list
+    lengths = [len(lst) for lst in lists]
+
+    # Create slices for each list
+    slices = [slice(None)] * len(lists)
     regions = []
 
-    for i, x in enumerate(x_points):
-        for j, y in enumerate(y_points):
-                
-            if i > 0 and j > 0:              
-                region = [[x_points[i-1], x_points[i]],
-                        [y_points[j-1], y_points[j]]]
-            
-                regions.append(region)
+    # Recursive function to generate regions
+    def generate_region(slice_indices):
+        if len(slice_indices) == len(lists):
+            region = np.array([[lst[i-1], lst[i]] for lst, i in zip(lists, slice_indices)])
+            regions.append(region.T)
+        else:
+            for i in range(1, lengths[len(slice_indices)]):
+                new_slice_indices = slice_indices + [i]
+                generate_region(new_slice_indices)
 
-    return regions
+    generate_region([])
 
-
-def createUnboundedRegions(distrib_params_1, distrib_params_2, sigma_factor):
-     
-
-    a1, a2 = getStartStop(distrib_params_1[0], distrib_params_1[1], sigma_factor)
-    b1, b2 = getStartStop(distrib_params_2[0], distrib_params_2[1], sigma_factor)
-
-    r1 = [[-np.inf, a1], [b2, np.inf]]
-    r2 = [[a1, a2], [b2, np.inf]]
-    r3 = [[a2, np.inf], [b2, np.inf]]
-    r4 = [[a2, np.inf], [b1, b2]]
-    r5 = [[a2, np.inf], [-np.inf, b1]]
-    r6 = [[a1, a2], [-np.inf, b1]]
-    r7 = [[-np.inf, a1], [-np.inf, b1]]
-    r8 = [[-np.inf, a1], [b1, b2]]
-
-    return [r1, r2, r3, r4, r5, r6, r7, r8]
+    return np.array(regions)
 
 
 
-def createCenterRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
+def createRegionPartitions(region_limits, n_partitions, type_partition):
     
-    x_points = generateIntervalsPerAxis(distrib_params_1, sigma_factor, n_partitions)
-    y_points = generateIntervalsPerAxis(distrib_params_2, sigma_factor, n_partitions)
+    dimension = region_limits.shape[-1]
 
-    regions = []
+    separations = []
 
-    for i, x in enumerate(x_points):
-        for j, y in enumerate(y_points):
-                
-            if i > 0 and j > 0:              
-                region = [[x_points[i-1], x_points[i]],
-                        [y_points[j-1], y_points[j]]]
-            
-                regions.append(region)
+    is_inf = np.logical_or(np.isinf(region_limits[0]), np.isinf(region_limits[1]))
+
+    #Generate separations for non-infinite limits
+    if type_partition == 'equally':
+        separations = [
+                        generateEquallySpacedIntervalsPerAxis(region_limits[0][n], region_limits[1][n], n_partitions[n])
+                        if not is_inf[n] else np.array([region_limits[0][n], region_limits[1][n]])
+                        for n in range(dimension)
+                      ]
+    elif type_partition == 'unequally_linear':
+        separations = [
+                        generateUnequallyLinearSpacedIntervalsPerAxis(region_limits[0][n], region_limits[1][n], n_partitions[n])
+                        if not is_inf[n] else np.array([region_limits[0][n], region_limits[1][n]])
+                        for n in range(dimension)
+                      ]
+
+    regions = generate_regions(*separations)
 
     return regions
 
-def createLeftLateralRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
-     
-    x_points = generateEquallySpacedIntervalsPerAxis(distrib_params_1[0] - sigma_factor*distrib_params_1[1], distrib_params_1[0] - (sigma_factor-1)*distrib_params_1[1], n_partitions//2)
-    y_points = generateEquallySpacedIntervalsPerAxis(distrib_params_2[0] - sigma_factor*distrib_params_2[1], distrib_params_2[0] + sigma_factor*distrib_params_2[1], n_partitions*2)
 
-    regions = []
-
-    for i, x in enumerate(x_points):
-        for j, y in enumerate(y_points):
-                
-            if i > 0 and j > 0:              
-                region = [[x_points[i-1], x_points[i]],
-                        [y_points[j-1], y_points[j]]]
-            
-                regions.append(region)
+def compute_outer_point(cubes, factor):
+#TODO: this method is only a heuristics. We should improve it to define an outer signature that makes sense somehow
     
-    return regions
-
-
-def createRightLateralRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
-     
-    x_points = generateEquallySpacedIntervalsPerAxis(distrib_params_1[0] + (sigma_factor-1)*distrib_params_1[1], distrib_params_1[0] + sigma_factor*distrib_params_1[1], n_partitions//2)
-    y_points = generateEquallySpacedIntervalsPerAxis(distrib_params_2[0] - sigma_factor*distrib_params_2[1], distrib_params_2[0] + sigma_factor*distrib_params_2[1], n_partitions*2)
-
-    regions = []
-
-    for i, x in enumerate(x_points):
-        for j, y in enumerate(y_points):
-                
-            if i > 0 and j > 0:              
-                region = [[x_points[i-1], x_points[i]],
-                        [y_points[j-1], y_points[j]]]
-            
-                regions.append(region)
-    
-    return regions
-
-
-def createUpperRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
-     
-    x_points = generateEquallySpacedIntervalsPerAxis(distrib_params_1[0] - (sigma_factor-1)*distrib_params_1[1], distrib_params_1[0] + (sigma_factor-1)*distrib_params_1[1], n_partitions*2)
-    y_points = generateEquallySpacedIntervalsPerAxis(distrib_params_2[0] + (sigma_factor-1)*distrib_params_2[1], distrib_params_2[0] + sigma_factor*distrib_params_2[1], n_partitions//2)
-
-    regions = []
-
-    for i, x in enumerate(x_points):
-        for j, y in enumerate(y_points):
-                
-            if i > 0 and j > 0:              
-                region = [[x_points[i-1], x_points[i]],
-                        [y_points[j-1], y_points[j]]]
-            
-                regions.append(region)
-    
-    return regions
-
-
-def createUnderRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
-     
-    x_points = generateEquallySpacedIntervalsPerAxis(distrib_params_1[0] - (sigma_factor-1)*distrib_params_1[1], distrib_params_1[0] + (sigma_factor-1)*distrib_params_1[1], n_partitions*2)
-    y_points = generateEquallySpacedIntervalsPerAxis(distrib_params_2[0] - sigma_factor*distrib_params_2[1], distrib_params_2[0] - (sigma_factor-1)*distrib_params_2[1], n_partitions//2)
-
-    regions = []
-
-    for i, x in enumerate(x_points):
-        for j, y in enumerate(y_points):
-                
-            if i > 0 and j > 0:              
-                region = [[x_points[i-1], x_points[i]],
-                        [y_points[j-1], y_points[j]]]
-            
-                regions.append(region)
-    
-    return regions
-
-
-def createRegionsAlternative(distrib_params_1, distrib_params_2, number_signatures):
-
-    n_center = number_signatures[0]
-    n_2sigma = number_signatures[1]
-    n_3sigma = number_signatures[2]
-    n_4sigma = number_signatures[3]
-    n_5sigma = number_signatures[4]
-     
-    center = createCenterRegions(distrib_params_1, distrib_params_2, 1, n_center)
-
-    lateral_left = createLeftLateralRegions(distrib_params_1, distrib_params_2, 2, n_2sigma)
-    lateral_right = createRightLateralRegions(distrib_params_1, distrib_params_2, 2, n_2sigma)
-    upper = createUpperRegions(distrib_params_1, distrib_params_2, 2, n_2sigma)
-    under = createUnderRegions(distrib_params_1, distrib_params_2, 2, n_2sigma)
-
-
-    lateral_left_after = createLeftLateralRegions(distrib_params_1, distrib_params_2, 3, n_3sigma)
-    lateral_right_after = createRightLateralRegions(distrib_params_1, distrib_params_2, 3, n_3sigma)
-    upper_after = createUpperRegions(distrib_params_1, distrib_params_2, 3, n_3sigma)
-    under_after = createUnderRegions(distrib_params_1, distrib_params_2, 3, n_3sigma)
-
-
-    lateral_left_after_later = createLeftLateralRegions(distrib_params_1, distrib_params_2, 4, n_4sigma)
-    lateral_right_after_later = createRightLateralRegions(distrib_params_1, distrib_params_2, 4, n_4sigma)
-    upper_after_later = createUpperRegions(distrib_params_1, distrib_params_2, 4, n_4sigma)
-    under_after_later = createUnderRegions(distrib_params_1, distrib_params_2, 4, n_4sigma)
-
-    lateral_left_after_later_then = createLeftLateralRegions(distrib_params_1, distrib_params_2, 5, n_5sigma)
-    lateral_right_after_later_then = createRightLateralRegions(distrib_params_1, distrib_params_2, 5, n_5sigma)
-    upper_after_later_then = createUpperRegions(distrib_params_1, distrib_params_2, 5, n_5sigma)
-    under_after_later_then = createUnderRegions(distrib_params_1, distrib_params_2, 5, n_5sigma)
-
-
-    unbounded_regions = createUnboundedRegions(distrib_params_1, distrib_params_2, 5)
-
-    regions = center + lateral_left + lateral_right + upper + under + lateral_left_after + lateral_right_after + upper_after + under_after + lateral_left_after_later + lateral_right_after_later + upper_after_later + under_after_later + lateral_left_after_later_then + lateral_right_after_later_then + upper_after_later_then + under_after_later_then + unbounded_regions
-
-    return regions
-     
-          
-
-
-def createRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions):
-     
-    bounded_regions = createBoundedRegions(distrib_params_1, distrib_params_2, sigma_factor, n_partitions)
-
-    unbounded_regions = createUnboundedRegions(distrib_params_1, distrib_params_2, sigma_factor)
-
-    regions = bounded_regions + unbounded_regions
-
-    return regions
-
-
-def computePosition(min, max, delta):
-
-    if np.isinf(min):
-            position = max - delta
-    elif np.isinf(max):
-            position = min + delta
+    if len(cubes) == 1:
+        # If there's only one cube, find a point outside it by extending one of its corners
+        cube = cubes[0]
+        outer_point = np.array(cube[0]) - factor * np.abs(np.array(cube[1]) - np.array(cube[0]))
+        return outer_point
+        
     else:
-            position = min + (max - min)/2
+        # If there are multiple cubes, find a central point guaranteed to be outside all of them
+        all_corners = np.array([corner for cube in cubes for corner in cube])
+        min_corner = np.min(all_corners, axis=0)
+        max_corner = np.max(all_corners, axis=0)
+        return (min_corner + max_corner + 0.5) / 2 #added this 0.5 to the case where this is zero
 
-    return position
+
+def computePosition(minimum, maximum):
+    return minimum + (maximum - minimum) / 2
 
 
-def placeSignatures(regions, delta):
-
-    signatures = []
-
-    for region in regions:       
-        signature_point = [
-                            computePosition(region[0][0], region[0][1], delta), 
-                            computePosition(region[1][0], region[1][1], delta)
-                          ]     
-        signatures.append(signature_point)
+@print_array_size
+def placeSignatures(bounded_regions):
     
-    return signatures
+    # Extract dimensions of regions
+    num_regions, _, num_dimensions = bounded_regions.shape
+
+    # Compute signature points for all bounded regions
+    signature_points = np.empty((num_regions, num_dimensions))
+    for dim in range(num_dimensions):
+        signature_points[:, dim] = computePosition(bounded_regions[:, 0, dim], bounded_regions[:, 1, dim])
+
+    return signature_points
+
+
+def addUnboundedRepresentations(regions, unbounded_region, signatures, outer_signature):
+
+    regions = np.concatenate((regions, [unbounded_region]))
+    signatures = np.concatenate((signatures, [outer_signature]))
+
+    return regions, signatures
+
+
+
+def defineRegionParameters(samples):
+    
+    mean = np.mean(samples, axis=0)
+    stdev = np.std(samples, axis=0)
+    
+    lower_bound = mean - 4 * stdev
+    upper_bound = mean + 4 * stdev
+    
+    return np.array([lower_bound, upper_bound])
+
+
+
+def updateGrid(samples, n_partitions, type_partition):
+        
+    hpr = defineRegionParameters(samples)
+
+    regions = createRegionPartitions(hpr, n_partitions, type_partition)
+    signatures = placeSignatures(regions)
+
+    return signatures, regions
 
 
 # ----------------------------------------------------------------------------------------- #
 # --------------------------------- Vertices of the grid ---------------------------------- #
 # ----------------------------------------------------------------------------------------- #
 
-def getVertices(region):
+def getVertices(cube):
     
-    vertice1 = [region[0][0], region[1][0]]
-    vertice2 = [region[0][0], region[1][1]]
-    vertice3 = [region[0][1], region[1][0]]
-    vertice4 = [region[0][1], region[1][1]]
+    dimensions = len(cube[0])  # Get the dimension of the cube
+    vertices = []
 
-    return [vertice1, vertice2, vertice3, vertice4]
+    for i in range(2 ** dimensions):
+        vertex = []
+        for j in range(dimensions):
+            if (i >> j) & 1:
+                vertex.append(cube[1][j])  # Use max value for this dimension
+            else:
+                vertex.append(cube[0][j])  # Use min value for this dimension
+        vertices.append(vertex)
+
+    return np.array(vertices)
