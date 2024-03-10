@@ -3,6 +3,7 @@ import math
 from scipy.stats import norm
 
 import propagation_methods as propag
+import bounds_linear_system_2d as bounds_linear
 
 def print_array_size(func):
     def wrapper(*args, **kwargs):
@@ -14,44 +15,6 @@ def print_array_size(func):
 # ----------------------------------------------------------------------------------------- #
 # ---------------------------------- Grid generation -------------------------------------- #
 # ----------------------------------------------------------------------------------------- #
-
-def generateEquallySpacedIntervalsPerAxis(start, stop, n_partitions):
-
-    return np.linspace(start, stop, n_partitions)
-
-
-def generateUnequallyLinearSpacedIntervalsPerAxis(start, stop, n_partitions):
-
-    sigma = (stop - start)/8
-
-    mark1 = start + 1*sigma
-    mark2 = start + 2*sigma
-    mark3 = start + 3*sigma
-    mark5 = start + 5*sigma
-    mark6 = start + 6*sigma
-    mark7 = start + 7*sigma
-
-    # x1 = np.linspace(start, mark1, int(np.ceil(0.1*n_partitions)))
-    # x2 = np.linspace(mark1, mark2, int(np.ceil(0.1*n_partitions)))
-    # x3 = np.linspace(mark2, mark3, int(np.ceil(0.2*n_partitions)))
-    # x4 = np.linspace(mark3, mark5, int(np.ceil(0.6*n_partitions))) #center
-    # x5 = np.linspace(mark5, mark6, int(np.ceil(0.2*n_partitions)))
-    # x6 = np.linspace(mark6, mark7, int(np.ceil(0.1*n_partitions)))
-    # x7 = np.linspace(mark7, stop, int(np.ceil(0.1*n_partitions)))
-
-    x1 = np.linspace(start, mark1, 5)
-    x2 = np.linspace(mark1, mark2, 15)
-    x3 = np.linspace(mark2, mark3, 40)
-    x4 = np.linspace(mark3, mark5, 110) #center
-    x5 = np.linspace(mark5, mark6, 40)
-    x6 = np.linspace(mark6, mark7, 15)
-    x7 = np.linspace(mark7, stop, 5)
-
-    #TODO: maybe latter set a minimum nb of signatures in each partition to 2, so both starts and ends are taken into account
-
-    return np.concatenate((x1, x2, x3, x4, x5, x6, x7))
-
-
 
 def generate_regions(*lists):
     if len(lists) == 0:
@@ -79,35 +42,7 @@ def generate_regions(*lists):
     return np.array(regions)
 
 
-
-def createRegionPartitions(region_limits, n_partitions, type_partition):
-    
-    dimension = region_limits.shape[-1]
-
-    separations = []
-
-    is_inf = np.logical_or(np.isinf(region_limits[0]), np.isinf(region_limits[1]))
-
-    #Generate separations for non-infinite limits
-    if type_partition == 'equally':
-        separations = [
-                        generateEquallySpacedIntervalsPerAxis(region_limits[0][n], region_limits[1][n], n_partitions[n])
-                        if not is_inf[n] else np.array([region_limits[0][n], region_limits[1][n]])
-                        for n in range(dimension)
-                      ]
-    elif type_partition == 'unequally_linear':
-        separations = [
-                        generateUnequallyLinearSpacedIntervalsPerAxis(region_limits[0][n], region_limits[1][n], n_partitions[n])
-                        if not is_inf[n] else np.array([region_limits[0][n], region_limits[1][n]])
-                        for n in range(dimension)
-                      ]
-
-    regions = generate_regions(*separations)
-
-    return regions
-
-
-def compute_outer_point(cubes, factor):
+def computeOuterPoint(cubes, factor):
 #TODO: this method is only a heuristics. We should improve it to define an outer signature that makes sense somehow
     
     if len(cubes) == 1:
@@ -128,7 +63,6 @@ def computePosition(minimum, maximum):
     return minimum + (maximum - minimum) / 2
 
 
-@print_array_size
 def placeSignatures(bounded_regions):
     
     # Extract dimensions of regions
@@ -163,16 +97,6 @@ def defineRegionParameters(samples):
 
 
 
-def updateGrid(samples, n_partitions, type_partition):
-        
-    hpr = defineRegionParameters(samples)
-
-    regions = createRegionPartitions(hpr, n_partitions, type_partition)
-    signatures = placeSignatures(regions)
-
-    return signatures, regions
-
-
 # ----------------------------------------------------------------------------------------- #
 # --------------------------------- Vertices of the grid ---------------------------------- #
 # ----------------------------------------------------------------------------------------- #
@@ -192,3 +116,128 @@ def getVertices(cube):
         vertices.append(vertex)
 
     return np.array(vertices)
+
+
+def findMinMaxPoints(samples):
+    x_min = np.min(samples[:, 0])
+    y_min = np.min(samples[:, 1])
+    x_max = np.max(samples[:, 0])
+    y_max = np.max(samples[:, 1])
+
+    min_point = np.array([x_min, y_min])
+    max_point = np.array([x_max, y_max])
+
+    return min_point, max_point
+
+
+# ----------------------------------------------------------------------------------------- #
+# ------------------------------------ Recursive grid ------------------------------------- #
+# ----------------------------------------------------------------------------------------- #
+def euclideanDistance(point1, point2):
+    return np.sqrt(np.sum(point1 - point2) ** 2)
+
+def regionSize(region):
+    
+    vertices = getVertices(region)
+    distance = euclideanDistance(vertices[0], vertices[-1])
+
+    return distance
+
+def pointInsideRegion(point, cube):    
+    min_bound, max_bound = cube
+    if np.any(point < min_bound) or np.any(point > max_bound):
+        return False
+    return True
+
+def checkProportionInsideRegion(points, cube):
+    #num_points_inside = np.sum([pointInsideRegion(point, cube) for point in points])
+    #return num_points_inside / len(points)
+    min_bound, max_bound = cube
+    return np.mean((np.all(points >= min_bound, axis=1)) & (np.all(points <= max_bound, axis=1)))
+
+
+# def checkProxyForContribution(points, cube, method, params, var_noise):
+    
+#     min_bound, max_bound = cube
+#     proba_estimate = np.mean((np.all(points >= min_bound, axis=1)) & (np.all(points <= max_bound, axis=1)))
+
+#     signature = placeSignatures(np.array([cube]))[0]
+
+#     if method == 'linear':
+#         A = params[0]
+#         max_value = bounds_linear.maxValueInsideRegion(A, signature, cube, var_noise)/(2*np.sqrt(2))
+    
+#     contribution = max_value * proba_estimate
+
+#     return contribution
+
+
+def check_condition(region, samples, min_proportion, min_size):
+    condition_proportion = checkProportionInsideRegion(samples, region) > min_proportion
+    condition_size = regionSize(region) > min_size
+
+    return condition_proportion & condition_size
+
+# def check_condition(region, samples, method, params, var_noise, threshold):
+   
+#     return checkProxyForContribution(samples, region, method, params, var_noise) > threshold
+
+
+def subdivideRegion(region, samples, min_proportion, min_size):
+    subregions = []
+    if check_condition(region, samples, min_proportion, min_size):
+        # If condition is true, subdivide the region in half
+        x_min, y_min = region[0]
+        x_max, y_max = region[1]
+
+        mid_x = (x_min + x_max) / 2
+        mid_y = (y_min + y_max) / 2
+        
+        # Define subregion boundaries
+        subregion1 = np.array([[x_min, y_min], [mid_x, mid_y]])
+        subregion2 = np.array([[mid_x, y_min], [x_max, mid_y]])
+        subregion3 = np.array([[x_min, mid_y], [mid_x, y_max]])
+        subregion4 = np.array([[mid_x, mid_y], [x_max, y_max]])
+
+        # Recursively check each subregion and collect subregions
+        subregions.extend(subdivideRegion(subregion1, samples, min_proportion, min_size))
+        subregions.extend(subdivideRegion(subregion2, samples, min_proportion, min_size))
+        subregions.extend(subdivideRegion(subregion3, samples, min_proportion, min_size))
+        subregions.extend(subdivideRegion(subregion4, samples, min_proportion, min_size))
+
+    else:
+        # If condition is false, append the region to the list of subregions
+        subregions.append(region)
+    return subregions
+
+
+def refineRegions(regions, signatures, contributions, threshold):
+    new_regions = []
+    new_signatures = []
+    
+    for i, contribution in enumerate(contributions):
+        if contribution > threshold and not np.isinf(regions[i][0][0]):
+            x_min, y_min = regions[i][0]
+            x_max, y_max = regions[i][1]
+            
+            x_mid = (x_min + x_max) / 2
+            y_mid = (y_min + y_max) / 2
+            
+            # Subdivide the region into four equal parts
+            new_regions.append([[x_min, y_min], [x_mid, y_mid]])  # Region 1
+            new_signatures.append([(x_min + x_mid)/2, (y_min + y_mid)/2])
+
+            new_regions.append([[x_mid, y_min], [x_max, y_mid]])  # Region 2
+            new_signatures.append([(x_mid + x_max)/2, (y_min + y_mid)/2])
+
+            new_regions.append([[x_min, y_mid], [x_mid, y_max]])  # Region 3
+            new_signatures.append([(x_min + x_mid)/2, (y_mid + y_max)/2])
+
+            new_regions.append([[x_mid, y_mid], [x_max, y_max]])  # Region 4
+            new_signatures.append([(x_mid + x_max)/2, (y_mid + y_max)/2])
+            
+        else:
+            new_regions.append(regions[i])
+            new_signatures.append(signatures[i])
+    
+    return np.array(new_regions), np.array(new_signatures)
