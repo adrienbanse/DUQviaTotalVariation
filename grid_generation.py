@@ -48,7 +48,7 @@ def computeOuterPoint(region):
     min_coords = [min(region[i][d] for i in range(len(region))) for d in range(dimensions)]
     
     # Choose a point close to the upper face
-    outer_point = [(min_coords[d] + max_coords[d]) / 2 if d != dimensions - 1 else max_coords[d] + 1e-1 for d in range(dimensions)]
+    outer_point = [(min_coords[d] + max_coords[d]) / 2 if d != dimensions - 1 else max_coords[d] + 1e-2 for d in range(dimensions)]
     
     return np.array(outer_point)
 
@@ -142,24 +142,23 @@ def check_condition(region, samples, min_proportion, min_size):
 def subdivideRegion(region, samples, min_proportion, min_size):
     subregions = []
     if check_condition(region, samples, min_proportion, min_size):
-        # If condition is true, subdivide the region in half
-        x_min, y_min = region[0]
-        x_max, y_max = region[1]
-
-        mid_x = (x_min + x_max) / 2
-        mid_y = (y_min + y_max) / 2
         
-        # Define subregion boundaries
-        subregion1 = np.array([[x_min, y_min], [mid_x, mid_y]])
-        subregion2 = np.array([[mid_x, y_min], [x_max, mid_y]])
-        subregion3 = np.array([[x_min, mid_y], [mid_x, y_max]])
-        subregion4 = np.array([[mid_x, mid_y], [x_max, y_max]])
+        # If condition is true, subdivide the region in half
+        num_dimensions = len(region[0])
+        midpoints = np.mean(region, axis=0)
 
-        # Recursively check each subregion and collect subregions
-        subregions.extend(subdivideRegion(subregion1, samples, min_proportion, min_size))
-        subregions.extend(subdivideRegion(subregion2, samples, min_proportion, min_size))
-        subregions.extend(subdivideRegion(subregion3, samples, min_proportion, min_size))
-        subregions.extend(subdivideRegion(subregion4, samples, min_proportion, min_size))
+        # Generate binary sequences for all possible subdivisions
+        for i in range(2 ** num_dimensions):
+            coords = np.empty_like(region)
+            for j in range(num_dimensions):
+                min_val = region[0][j]
+                max_val = region[1][j]
+                mid_val = midpoints[j]
+                if i & (1 << j):
+                    coords[:, j] = np.array([mid_val, max_val])
+                else:
+                    coords[:, j] = np.array([min_val, mid_val])
+            subregions.extend(subdivideRegion(coords, samples, min_proportion, min_size))
 
     else:
         # If condition is false, append the region to the list of subregions
@@ -170,30 +169,29 @@ def subdivideRegion(region, samples, min_proportion, min_size):
 def refineRegions(regions, signatures, contributions, threshold):
     new_regions = []
     new_signatures = []
-    
+
     for i, contribution in enumerate(contributions):
         if contribution > threshold and not np.isinf(regions[i][0][0]):
-            x_min, y_min = regions[i][0]
-            x_max, y_max = regions[i][1]
-            
-            x_mid = (x_min + x_max) / 2
-            y_mid = (y_min + y_max) / 2
-            
-            # Subdivide the region into four equal parts
-            new_regions.append([[x_min, y_min], [x_mid, y_mid]])  # Region 1
-            new_signatures.append([(x_min + x_mid)/2, (y_min + y_mid)/2])
+            num_dimensions = regions[i].shape[1]  # Get the number of dimensions
 
-            new_regions.append([[x_mid, y_min], [x_max, y_mid]])  # Region 2
-            new_signatures.append([(x_mid + x_max)/2, (y_min + y_mid)/2])
+            # Calculate midpoints for each dimension
+            midpoints = np.mean(regions[i], axis=0)
 
-            new_regions.append([[x_min, y_mid], [x_mid, y_max]])  # Region 3
-            new_signatures.append([(x_min + x_mid)/2, (y_mid + y_max)/2])
-
-            new_regions.append([[x_mid, y_mid], [x_max, y_max]])  # Region 4
-            new_signatures.append([(x_mid + x_max)/2, (y_mid + y_max)/2])
-            
+            # Generate binary sequences for all possible subdivisions
+            for j in range(2 ** num_dimensions):
+                coords = np.empty_like(regions[i])
+                for k in range(num_dimensions):
+                    if j & (1 << k):
+                        coords[:, k] = np.array([midpoints[k], regions[i][1][k]])
+                    else:
+                        coords[:, k] = np.array([regions[i][0][k], midpoints[k]])
+                new_regions.append(coords)
+                
+                # Calculate signatures for each subregion
+                sub_sig = np.mean(coords, axis=0)
+                new_signatures.append(sub_sig)
         else:
             new_regions.append(regions[i])
             new_signatures.append(signatures[i])
-    
+
     return np.array(new_regions), np.array(new_signatures)
