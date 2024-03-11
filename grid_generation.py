@@ -156,31 +156,11 @@ def checkProportionInsideRegion(points, cube):
     return np.mean((np.all(points >= min_bound, axis=1)) & (np.all(points <= max_bound, axis=1)))
 
 
-# def checkProxyForContribution(points, cube, method, params, var_noise):
-    
-#     min_bound, max_bound = cube
-#     proba_estimate = np.mean((np.all(points >= min_bound, axis=1)) & (np.all(points <= max_bound, axis=1)))
-
-#     signature = placeSignatures(np.array([cube]))[0]
-
-#     if method == 'linear':
-#         A = params[0]
-#         max_value = bounds_linear.maxValueInsideRegion(A, signature, cube, var_noise)/(2*np.sqrt(2))
-    
-#     contribution = max_value * proba_estimate
-
-#     return contribution
-
-
 def check_condition(region, samples, min_proportion, min_size):
     condition_proportion = checkProportionInsideRegion(samples, region) > min_proportion
     condition_size = regionSize(region) > min_size
 
     return condition_proportion & condition_size
-
-# def check_condition(region, samples, method, params, var_noise, threshold):
-   
-#     return checkProxyForContribution(samples, region, method, params, var_noise) > threshold
 
 
 def subdivideRegion(region, samples, min_proportion, min_size):
