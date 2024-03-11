@@ -42,21 +42,15 @@ def generate_regions(*lists):
     return np.array(regions)
 
 
-def computeOuterPoint(cubes, factor):
-#TODO: this method is only a heuristics. We should improve it to define an outer signature that makes sense somehow
+def computeOuterPoint(region):
+    dimensions = len(region[0])  # Get the number of dimensions
+    max_coords = [max(region[i][d] for i in range(len(region))) for d in range(dimensions)]
+    min_coords = [min(region[i][d] for i in range(len(region))) for d in range(dimensions)]
     
-    if len(cubes) == 1:
-        # If there's only one cube, find a point outside it by extending one of its corners
-        cube = cubes[0]
-        outer_point = np.array(cube[0]) - factor * np.abs(np.array(cube[1]) - np.array(cube[0]))
-        return outer_point
-        
-    else:
-        # If there are multiple cubes, find a central point guaranteed to be outside all of them
-        all_corners = np.array([corner for cube in cubes for corner in cube])
-        min_corner = np.min(all_corners, axis=0)
-        max_corner = np.max(all_corners, axis=0)
-        return (min_corner + max_corner + 0.5) / 2 #added this 0.5 to the case where this is zero
+    # Choose a point close to the upper face
+    outer_point = [(min_coords[d] + max_coords[d]) / 2 if d != dimensions - 1 else max_coords[d] + 1e-1 for d in range(dimensions)]
+    
+    return np.array(outer_point)
 
 
 def computePosition(minimum, maximum):
@@ -85,18 +79,6 @@ def addUnboundedRepresentations(regions, unbounded_region, signatures, outer_sig
 
 
 
-def defineRegionParameters(samples):
-    
-    mean = np.mean(samples, axis=0)
-    stdev = np.std(samples, axis=0)
-    
-    lower_bound = mean - 4 * stdev
-    upper_bound = mean + 4 * stdev
-    
-    return np.array([lower_bound, upper_bound])
-
-
-
 # ----------------------------------------------------------------------------------------- #
 # --------------------------------- Vertices of the grid ---------------------------------- #
 # ----------------------------------------------------------------------------------------- #
@@ -119,13 +101,9 @@ def getVertices(cube):
 
 
 def findMinMaxPoints(samples):
-    x_min = np.min(samples[:, 0])
-    y_min = np.min(samples[:, 1])
-    x_max = np.max(samples[:, 0])
-    y_max = np.max(samples[:, 1])
 
-    min_point = np.array([x_min, y_min])
-    max_point = np.array([x_max, y_max])
+    min_point = np.min(samples, axis=0)
+    max_point = np.max(samples, axis=0)
 
     return min_point, max_point
 
