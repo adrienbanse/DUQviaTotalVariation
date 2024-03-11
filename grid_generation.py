@@ -128,8 +128,6 @@ def pointInsideRegion(point, cube):
     return True
 
 def checkProportionInsideRegion(points, cube):
-    #num_points_inside = np.sum([pointInsideRegion(point, cube) for point in points])
-    #return num_points_inside / len(points)
     min_bound, max_bound = cube
     return np.mean((np.all(points >= min_bound, axis=1)) & (np.all(points <= max_bound, axis=1)))
 
