@@ -33,9 +33,23 @@ def systemDynamics(x, method, params):
     
     elif method == 'polynomial':
         h = params[0]
+        #component_1 = x[:, 0] + h * x[:, 1]
+        #component_2 = x[:, 1] + h * (1/3 * x[:, 0]**3 - x[:, 0] - x[:, 1])
+
         component_1 = x[:, 0] + h * x[:, 1]
-        component_2 = x[:, 1] + h * (1/3 * x[:, 0]**3 - x[:, 0] - x[:, 1])
+        component_2 = x[:, 1] + h * ( 0.25 * x[:, 0]**2 - 0.4 * x[:, 0] * x[:, 1] + 0.25*x[:, 1]**2 )
         return np.column_stack((component_1, component_2))
+    
+    elif method == 'dubin':
+        h = params[0]
+        v = params[1]
+        u = params[2]
+
+        component_1 = x[:, 0] + h * v * np.sin(x[:, 2])
+        component_2 = x[:, 1] + h * v * np.cos(x[:, 2])
+        component_3 = x[:, 2] + h * u
+
+        return np.column_stack((component_1, component_2, component_3))
     
     else:
         raise Exception("Please refer to the method's signature")
