@@ -22,9 +22,9 @@ def erf(x):
 def insideSumTerm(h, v, u, x, signature, var_noise):
 
     sum = 0
-    sum += 1/(var_noise[0]**0.5) * (abs(x[0] - signature[0]) + h*v*abs(x[2] - signature[2]))
-    sum += 1/(var_noise[1]**0.5) * (abs(x[1] - signature[1]) + h*v*abs(x[2] - signature[2]))
-    sum += 1/(var_noise[2]**0.5) * abs(x[2] - signature[2])
+    sum += 1/(var_noise[0]) * (x[0] - signature[0] + h*v* (np.sin(x[2]) - np.sin(signature[2])))**2
+    sum += 1/(var_noise[1]) * (x[1] - signature[1] + h*v* (np.cos(x[2]) - np.cos(signature[2])))**2
+    sum += 1/(var_noise[2]) * (x[2] - signature[2])**2
     
     return sum
 
@@ -36,6 +36,6 @@ def maxValueInsideRegion(h, v, u, signature, region, var_noise):
     vertices = grid.getVertices(region)
     
     for vertice in vertices:
-        max_value = max(max_value, insideSumTerm(h, v, u, vertice, signature, var_noise))
+        max_value = max(max_value, sqrt(insideSumTerm(h, v, u, vertice, signature, var_noise)))
 
     return max_value
