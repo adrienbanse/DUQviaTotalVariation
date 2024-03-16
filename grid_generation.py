@@ -108,6 +108,13 @@ def findMinMaxPoints(samples):
     return min_point, max_point
 
 
+def checkIfPointIsInRegion(point, region):
+    return np.all(point >= region[0]) and np.all(point <= region[1])
+
+def getCenteredRegion(region, point):
+    return region - point
+
+
 # ----------------------------------------------------------------------------------------- #
 # ------------------------------------ Recursive grid ------------------------------------- #
 # ----------------------------------------------------------------------------------------- #
