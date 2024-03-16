@@ -36,8 +36,9 @@ def systemDynamics(x, method, params):
         #component_1 = x[:, 0] + h * x[:, 1]
         #component_2 = x[:, 1] + h * (1/3 * x[:, 0]**3 - x[:, 0] - x[:, 1])
 
-        component_1 = x[:, 0] + h * x[:, 1]
-        component_2 = x[:, 1] + h * ( 0.25 * x[:, 0]**2 - 0.4 * x[:, 0] * x[:, 1] + 0.25*x[:, 1]**2 )
+        component_1 = x[:, 0] + 1.25 * h * x[:, 1]
+        component_2 = 1.4 * x[:, 1] + h * 0.3 * ( 0.25*x[:, 0]**2 - 0.4 * x[:, 0] * x[:, 1] + 0.25*x[:, 1]**2 )
+        
         return np.column_stack((component_1, component_2))
     
     elif method == 'dubin':
