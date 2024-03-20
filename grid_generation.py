@@ -202,3 +202,35 @@ def refineRegions(regions, signatures, contributions, threshold):
             new_signatures.append(signatures[i])
 
     return np.array(new_regions), np.array(new_signatures)
+
+
+
+def check_condition_uniformly(region, min_size):
+    condition_size = regionSize(region) > min_size
+    return condition_size
+
+def subdivideRegionUniformly(region, min_size):
+    subregions = []
+    if check_condition_uniformly(region, min_size):
+        
+        # If condition is true, subdivide the region in half
+        num_dimensions = len(region[0])
+        midpoints = np.mean(region, axis=0)
+
+        # Generate binary sequences for all possible subdivisions
+        for i in range(2 ** num_dimensions):
+            coords = np.empty_like(region)
+            for j in range(num_dimensions):
+                min_val = region[0][j]
+                max_val = region[1][j]
+                mid_val = midpoints[j]
+                if i & (1 << j):
+                    coords[:, j] = np.array([mid_val, max_val])
+                else:
+                    coords[:, j] = np.array([min_val, mid_val])
+            subregions.extend(subdivideRegionUniformly(coords,min_size))
+
+    else:
+        # If condition is false, append the region to the list of subregions
+        subregions.append(region)
+    return subregions
