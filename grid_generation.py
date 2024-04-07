@@ -205,32 +205,23 @@ def refineRegions(regions, signatures, contributions, threshold):
 
 
 
-def check_condition_uniformly(region, min_size):
-    condition_size = regionSize(region) > min_size
-    return condition_size
-
-def subdivideRegionUniformly(region, min_size):
-    subregions = []
-    if check_condition_uniformly(region, min_size):
-        
-        # If condition is true, subdivide the region in half
-        num_dimensions = len(region[0])
-        midpoints = np.mean(region, axis=0)
-
-        # Generate binary sequences for all possible subdivisions
-        for i in range(2 ** num_dimensions):
-            coords = np.empty_like(region)
-            for j in range(num_dimensions):
-                min_val = region[0][j]
-                max_val = region[1][j]
-                mid_val = midpoints[j]
-                if i & (1 << j):
-                    coords[:, j] = np.array([mid_val, max_val])
-                else:
-                    coords[:, j] = np.array([min_val, mid_val])
-            subregions.extend(subdivideRegionUniformly(coords,min_size))
-
-    else:
-        # If condition is false, append the region to the list of subregions
-        subregions.append(region)
-    return subregions
+def subdivideRegionUniformly(region, n):
+    x_min = min(region[0][0], region[1][0])
+    x_max = max(region[0][0], region[1][0])
+    y_min = min(region[0][1], region[1][1])
+    y_max = max(region[0][1], region[1][1])
+    
+    x_interval = (x_max - x_min) / n
+    y_interval = (y_max - y_min) / n
+    
+    partitions = []
+    
+    for i in range(n):
+        for j in range(n):
+            x_start = x_min + i * x_interval
+            x_end = x_start + x_interval
+            y_start = y_min + j * y_interval
+            y_end = y_start + y_interval
+            partitions.append([[x_start, y_start], [x_end, y_end]])
+    
+    return partitions
