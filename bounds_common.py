@@ -51,7 +51,7 @@ def verifyIfRegionIsBounded(region):
 
 def findHyperCubicEnvelope(region, method, params):
  
-    vertices = grid.getVertices(region)
+    vertices = grid.get_vertices(region)
 
     if method == 'linear':
  
@@ -71,7 +71,7 @@ def findHyperCubicEnvelope(region, method, params):
         min_f1, min_f2 = np.min(propagated_vertices, axis = 0)
         max_f1, max_f2 = np.max(propagated_vertices, axis = 0)
  
-        if grid.checkIfPointIsInRegion(np.array([0, 0]), region):
+        if grid.check_if_point_is_in_region(np.array([0, 0]), region):
             min_f2 = min(min_f2, 0)
  
         return np.array([[min_f1, min_f2], [max_f1, max_f2]])
@@ -125,13 +125,13 @@ def transformEnvelope(envelope, var_noise, signature, method, params):
 
     components = propag.systemDynamics(np.array([signature]), method, params)
 
-    centered_envelope = grid.getCenteredRegion(envelope, components)
+    centered_envelope = grid.get_centered_region(envelope, components)
 
     return np.dot(centered_envelope, L)
 
 
 def computeMax(envelope):
-    vertices = grid.getVertices(envelope)
+    vertices = grid.get_vertices(envelope)
     norms = np.linalg.norm(vertices, axis=1)
     max_value = np.max(norms)
     return max_value
@@ -142,7 +142,7 @@ def computeMax(envelope):
 # ----------------------------------------------------------------------------------------- #
 
 @print_bound
-def computeUpperBoundForTVWithMax(signatures, regions, probas, var_noise, method, params):
+def compute_upper_bound_for_TV(signatures, regions, probas, var_noise, method, params):
 
     tv = 0
 
@@ -159,20 +159,6 @@ def computeUpperBoundForTVWithMax(signatures, regions, probas, var_noise, method
 
             max_value = erf(computeMax(envelope)/(2*sqrt(2)))
 
-        # if verifyIfRegionIsBounded(region):
-        #     if method == 'linear':
-        #         A = params[0]
-        #         max_value = erf(bounds_linear.maxValueInsideRegion(A, signature, region, var_noise)/(2*sqrt(2)))
-
-        #     elif method == 'polynomial':
-        #         h = params[0]
-        #         #max_value = erf(bounds_polynomial.maxValueInsideRegion(h, signature, region, var_noise)/(2*sqrt(2)))
-
-        #     elif method == 'dubin':
-        #         h = params[0]
-        #         v = params[1]
-        #         u = params[2]
-        #         #max_value = erf(bounds_dubin.maxValueInsideRegion(h, v, u, signature, region, var_noise)/(2*sqrt(2)))
         else:
             max_value = 1
 

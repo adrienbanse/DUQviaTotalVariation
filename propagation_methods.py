@@ -6,7 +6,7 @@ import math
 from scipy.stats import multivariate_normal
 
 
-def getInitialState(mean, var, size):
+def get_initial_state(mean, var, size):
 
     cov = np.diag(var)
     
@@ -89,7 +89,7 @@ def monteCarloSimulationSystem(n_simulations, mean_initial_state, cov_initial_st
     
     for i in range(n_simulations):
     
-        initial_state = getInitialState(mean_initial_state, cov_initial_state)
+        initial_state = get_initial_state(mean_initial_state, cov_initial_state, )
         final_state = stateEvolution(initial_state, mean_noise, cov_noise, n_steps_ahead, method, params)
 
         initial_states.append(initial_state)
@@ -98,20 +98,20 @@ def monteCarloSimulationSystem(n_simulations, mean_initial_state, cov_initial_st
     return initial_states, final_states
 
 
-def sampleFromGMM(n_samples, weights, means, var):
-                
-    sampled_points = []
-
-    cov = np.diag(var)
-
-    for i in range(n_samples):
-        
-        index_normal = np.random.choice(len(weights), p = weights)
-
-        rv = multivariate_normal(mean = means[index_normal], cov = cov)
-
-        sample_from_component = rv.rvs(size = 1)
-
-        sampled_points.append(sample_from_component)
-
-    return np.array(sampled_points)
+# def sampleFromGMM(n_samples, weights, means, var):
+#
+#     sampled_points = []
+#
+#     cov = np.diag(var)
+#
+#     for i in range(n_samples):
+#
+#         index_normal = np.random.choice(len(weights), p = weights)
+#
+#         rv = multivariate_normal(mean = means[index_normal], cov = cov)
+#
+#         sample_from_component = rv.rvs(size = 1)
+#
+#         sampled_points.append(sample_from_component)
+#
+#     return np.array(sampled_points)

@@ -33,7 +33,7 @@ def maxValueInsideRegion(A, signature, region, var_noise):
 
     max_value = 0
 
-    vertices = grid.getVertices(region)
+    vertices = grid.get_vertices(region)
     
     for vertice in vertices:
 

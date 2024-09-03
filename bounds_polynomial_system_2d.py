@@ -43,7 +43,7 @@ def maxValueInsideRegion(h, signature, region, var_noise):
     #max_value_0, max_value_1 = 0, 0
     max_value = 0
 
-    vertices = grid.getVertices(region)
+    vertices = grid.get_vertices(region)
 
     #Add other points where the max value can be (see math)
     # if region[0][0] < 1 < region[1][0]:
