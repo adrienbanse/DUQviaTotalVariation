@@ -21,56 +21,49 @@ def timer_func(func):
 # ------------------------ Gaussian probability mass inside hypercube --------------------- #
 # ----------------------------------------------------------------------------------------- #
  
-def erf_factor(mean: torch.Tensor, variance: torch.Tensor, region_min: torch.Tensor, region_max: torch.Tensor):
-    # Compute the square root of 2 * variance
-    sqrt2var = torch.sqrt(2 * variance)
-    # Ensure that mean, region_min, and region_max are broadcasted correctly
-    # mean shape: (num_components, dimension)
-    # variance shape: (num_components, dimension)
-    # region_min/max shape: (num_regions, dimension)
+def erf_factor(means: torch.Tensor, covs: torch.Tensor, regions_min: torch.Tensor, regions_max: torch.Tensor):
 
-    # Expand dimensions for broadcasting
-    # mean shape will become: (1, num_components, dimension) -> (num_regions, num_components, dimension)
-    mean_expanded = mean.unsqueeze(0)  # shape: (1, num_components, dimension)
-    variance_expanded = variance.unsqueeze(0)  # shape: (1, num_components, dimension)
+    means_broadcast = means.unsqueeze(0)  # Shape: (1, num_components, dimension)
 
-    # region_min/max shape will become: (num_regions, 1, dimension) -> (num_regions, num_components, dimension)
-    region_min_expanded = region_min.unsqueeze(1)  # shape: (num_regions, 1, dimension)
-    region_max_expanded = region_max.unsqueeze(1)  # shape: (num_regions, 1, dimension)
+    variances = covs.diagonal(dim1=-2, dim2=-1)  # Take diagonal values of covariance
+    variances_broadcast = variances.unsqueeze(0)  # shape: (1, num_components, dimension)
+
+    regions_min_broadcast = regions_min.unsqueeze(1)  # Shape: (num_regions, 1, dimension)
+    regions_max_broadcast = regions_max.unsqueeze(1)  # Shape: (num_regions, 1, dimension)
 
     # Broadcast and compute scaled_min and scaled_max
-    scaled_min = (mean_expanded - region_min_expanded) / torch.sqrt(2 * variance_expanded)
-    scaled_max = (mean_expanded - region_max_expanded) / torch.sqrt(2 * variance_expanded)
+    scaled_mins = (means_broadcast - regions_min_broadcast) / torch.sqrt(2 * variances_broadcast)
+    scaled_maxs = (means_broadcast - regions_max_broadcast) / torch.sqrt(2 * variances_broadcast)
 
-    return torch.special.erf(scaled_min) - torch.special.erf(scaled_max)
+    return torch.special.erf(scaled_mins) - torch.special.erf(scaled_maxs)
  
  
-def gaussian_proba_mass_inside_hypercube(means, var, regions):
+def gaussian_proba_mass_inside_hypercubes(means, covs, regions):
 
     factor = 1/(2 ** means.shape[-1])
 
-    region_min = regions[:, 0, :]  # Extracting min bounds for all regions
-    region_max = regions[:, 1, :]  # Extracting max bounds for all regions
+    regions_min = regions[:, 0, :]  # Extracting min bounds for all regions
+    regions_max = regions[:, 1, :]  # Extracting max bounds for all regions
 
-    erfs = erf_factor(means, var, region_min, region_max)
+    erfs = erf_factor(means, covs, regions_min, regions_max)
  
     return factor * erfs.prod(dim=-1)
  
  
-def gaussian_mixture_proba_mass_inside_hypercube(weights, means, var, regions):
+def gaussian_mixture_proba_mass_inside_hypercubes(means, cov, weights, regions):
 
-    proba_segment = gaussian_proba_mass_inside_hypercube(means, var, regions)
+    covs = cov.unsqueeze(0).expand(means.size(0), -1, -1)
+
+    proba_segment = gaussian_proba_mass_inside_hypercubes(means, covs, regions)
     proba_region = (weights * proba_segment).sum(dim=-1)
     
     return proba_region
  
  
 @timer_func
-def compute_signature_probabilities(regions, means, cov, weights):
+def compute_signature_probabilities(means, cov, weights, regions):
 
-    signature_probas = gaussian_mixture_proba_mass_inside_hypercube(weights, means, cov, regions)
-
-    signature_probas = torch.Tensor(signature_probas)
+    signature_probas = gaussian_mixture_proba_mass_inside_hypercubes(means, cov, weights, regions)
 
     # the remaining probability is attributed to the whole unbounded region
     unbounded_proba = torch.Tensor([1 - signature_probas.sum()])

@@ -65,8 +65,8 @@ def place_signatures(bounded_regions: torch.Tensor):
 
 def add_unbounded_representations(regions, unbounded_region, signatures, outer_signature):
 
-    regions = torch.cat((regions, unbounded_region))
-    signatures = torch.cat((signatures, outer_signature))
+    regions = torch.cat((regions, unbounded_region.unsqueeze(0)))
+    signatures = torch.cat((signatures, outer_signature.unsqueeze(0)))
 
     return regions, signatures
 
@@ -76,20 +76,45 @@ def add_unbounded_representations(regions, unbounded_region, signatures, outer_s
 # --------------------------------- Vertices of the grid ---------------------------------- #
 # ----------------------------------------------------------------------------------------- #
 
-def get_vertices(hypercube):
-    dimensions = hypercube.size(1)  # Get the dimension of the cube
+# def get_vertices(hypercube):
+#     dimensions = hypercube.size(1)  # Get the dimension of the cube
+#
+#     # Generate all possible combinations of 0s and 1s
+#     combinations = torch.stack(torch.meshgrid(*[torch.arange(2)] * dimensions, indexing='ij'), dim=-1).reshape(-1, dimensions)
+#
+#     # Determine which dimensions are min or max
+#     min_values = hypercube[0]  # Min values for each dimension
+#     max_values = hypercube[1]  # Max values for each dimension
+#
+#     # Compute vertices
+#     vertices = combinations * max_values + (1 - combinations) * min_values
+#
+#     return vertices
+
+def get_vertices(hypercubes: torch.Tensor):
+
+    if hypercubes.dim() == 2:  #If hypercubes contains only one hypercube
+        hypercubes = hypercubes.unsqueeze(0)
+
+    n, _, dimensions = hypercubes.size()
 
     # Generate all possible combinations of 0s and 1s
-    combinations = torch.stack(torch.meshgrid(*[torch.arange(2)] * dimensions, indexing='ij'), dim=-1).reshape(-1, dimensions)
+    combinations = torch.cartesian_prod(*[torch.tensor([0, 1])] * dimensions).float()
+
+    combinations = combinations.unsqueeze(0).expand(n, -1, -1)
 
     # Determine which dimensions are min or max
-    min_values = hypercube[0]  # Min values for each dimension
-    max_values = hypercube[1]  # Max values for each dimension
+    min_values = hypercubes[:, 0, :]  # (n, d)
+    max_values = hypercubes[:, 1, :]  # (n, d)
 
     # Compute vertices
-    vertices = combinations * max_values + (1 - combinations) * min_values
+    vertices = combinations * max_values.unsqueeze(1) + (1 - combinations) * min_values.unsqueeze(1)  # (n, 2^d, d)
 
     return vertices
+
+def get_centered_region(regions, points):
+    points = points.unsqueeze(1)
+    return regions - points
 
 
 def identify_high_prob_region(samples: torch.Tensor):
@@ -106,9 +131,6 @@ def check_if_point_is_in_region(point, region):
 
     inside = (point >= lower_extremities) & (point <= upper_extremities)
     return inside.all(dim=1)
-
-def get_centered_region(region, point):
-    return region - point
 
 
 # ----------------------------------------------------------------------------------------- #
@@ -163,6 +185,12 @@ def subdivide_region(region, samples, min_proportion, min_size):
         subregions.extend(subdivide_region(new_region, samples, min_proportion, min_size))
 
     return subregions
+
+def create_regions(high_prob_region, samples, min_proportion, min_size):
+    regions = subdivide_region(high_prob_region, samples, min_proportion, min_size)
+    regions = torch.stack([torch.stack([r[0], r[1]]) for r in regions])
+
+    return regions
 
 
 def refine_regions(regions, signatures, contributions, threshold):

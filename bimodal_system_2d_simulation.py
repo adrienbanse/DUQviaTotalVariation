@@ -4,7 +4,10 @@ import grid_generation as grid
 import bounds_common as bounds
 import propagation_methods as propag
 import probability_mass_computation as proba
+import total_variation_bound as tv
 import monte_carlo
+
+import tv_bound_algorithm as algorithm
 
 from dynamics import LinearDynamics
 from distributions import GaussianMixture, Gaussian
@@ -27,13 +30,13 @@ A = torch.Tensor(
 # Initial distribution parameters
 initial_weights = torch.Tensor([0.5, 0.5])
 initial_means = torch.Tensor([[8, 10], [6, 10]])
-sigma = 0.1
+sigma = 0.01
 cov = sigma * torch.eye(2)
 initial_covariances = torch.stack((cov, cov), dim=0)
 
 # Noise
 mean_noise = torch.Tensor([0, 0])
-sigma_noise = 0.03
+sigma_noise = 0.1
 cov_noise = sigma_noise * torch.eye(2)  # Assumes uncorrelation (this could be relaxed in further upgrades)
 
 # Unbounded region (arbitrary definition)
@@ -54,44 +57,38 @@ if __name__ == "__main__":
     #hitting_probs_monte_carlo = monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, 10, 10000)
 
     samples = initial_distribution(1000)
-
+    #
     macro = grid.identify_high_prob_region(samples)
-    print(macro)
-    print(macro.shape)
-
-    print(grid.get_vertices(macro))
-
-    print(samples.shape)
-
-    regions = grid.subdivide_region(macro, samples, 0.01, 0.2)
-    regions = torch.stack([torch.stack([r[0], r[1]]) for r in regions])
+    # print(macro)
+    # print(macro.shape)
+    #
+    # print(grid.get_vertices(macro))
+    #
+    # print(samples.shape)
+    #
+    regions = grid.create_regions(macro, samples, 0.01, 0.1)
     print(regions)
     print(regions.shape)
+    #
+    # outer_point = grid.outer_point(macro)
+    #
+    # signatures = grid.place_signatures(regions)
+    #
+    # print(signatures)
+    #
+    # #compute_signature_probabilities_in_parallel(regions, means, cov, weights):
+    #
+    # p = proba.compute_signature_probabilities(initial_means, cov_noise, initial_weights, regions)
+    # print(p)
+    # print(p.sum())
+    #
+    # print(signatures.shape)
+    # print(outer_point.shape)
+    # regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures, outer_point)
+    # #print(signatures)
 
-    signatures = grid.place_signatures(regions)
-
-    print(signatures)
-
-    #compute_signature_probabilities_in_parallel(regions, means, cov, weights):
-
-    p = proba.compute_signature_probabilities(regions, initial_means, cov_noise, initial_weights)
-    print(p)
-    print(p.sum())
+    print(algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, barrier))
 
 
-    def draw_square(x_min, y_min, x_max, y_max):
-        plt.plot([x_min, x_max, x_max, x_min, x_min], [y_min, y_min, y_max, y_max, y_min], color='blue')
 
 
-    def plot_regions(regions):
-        for region in regions:
-            x_min, y_min = region[0]
-            x_max, y_max = region[1]
-            draw_square(x_min, y_min, x_max, y_max)
-        plt.xlabel('State[0]')
-        plt.ylabel('State[1]')
-        plt.grid(True)
-        plt.axis('equal')  # Set equal aspect ratio
-        plt.show()
-
-    plot_regions(regions)
