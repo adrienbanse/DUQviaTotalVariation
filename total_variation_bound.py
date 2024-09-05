@@ -32,22 +32,16 @@ def compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, probs, 
     bounded_signatures = signatures[:-1]
 
     envelopes = dynamics.compute_hypercube_envelopes(bounded_regions)
-
-
-    transformed_envelopes = dynamics.compute_envelope_transform(noise_distribution, bounded_signatures, envelopes)
-
+    transformed_envelopes = dynamics.compute_envelopes_transform(noise_distribution, bounded_signatures, envelopes)
 
     h = dynamics.compute_h(transformed_envelopes)
 
     max_values = erf(h)
 
-    # Initialize max_values with 1 for unbounded regions
-    max_values = torch.stack((max_values, torch.ones(1)), dim=1)
-    max_values = max_values[0]
+    max_values = torch.cat((max_values, torch.ones(1)), dim=0)
 
     # Compute contributions and TV value
-    #contributions = max_values * probs
-    contributions = torch.dot(max_values, probs)
+    contributions = max_values * probs
     tv = torch.sum(contributions)
 
-    return tv, contributions.tolist()
+    return tv, contributions

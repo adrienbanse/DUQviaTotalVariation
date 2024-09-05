@@ -3,24 +3,26 @@ import probability_mass_computation as proba
 import grid_generation as grid
 import total_variation_bound as tv
 
+import matplotlib.pyplot as plt
+
 from distributions import GaussianMixture
 
 n_samples = 10000
 
 min_proportion = 0.01
 min_size = 0.001
-n_refinements = 5
+n_refinements = 3
 
 unbounded_region = torch.Tensor([[torch.inf, torch.inf], [torch.inf, torch.inf]])  # a representation choice for the unbounded region
 
-n_steps_ahead = 5
+n_steps_ahead = 3
 
 def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barrier):
 
     tv_bounds = [0.0]
     gmm_hitting_proba = [0.0]
 
-    #fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
 
     #rect = Rectangle(barrier[0], barrier[1][0] - barrier[0][0], barrier[1][1] - barrier[0][1],
     #                 edgecolor='red', facecolor='lightcoral', fill=True, lw=1, alpha=0.7, label='Unsafe set')
@@ -41,49 +43,44 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
             gmm_hitting_proba.append(proba_barrier)
 
         samples = hat_gmm(n_samples)
-        #plt.hist2d(samples[:, 0], samples[:, 1], bins=100, cmap=colors[t], alpha=0.8, cmin=0.1)
+        plt.hist2d(samples[:, 0], samples[:, 1], bins=100, alpha=0.8, cmin=0.1)
 
-        if t < n_steps_ahead:
+        high_prob_region = grid.identify_high_prob_region(samples)
+        outer_signature = grid.outer_point(high_prob_region)
 
-            high_prob_region = grid.identify_high_prob_region(samples)
-            outer_signature = grid.outer_point(high_prob_region)
+        regions = grid.create_regions(high_prob_region, samples, min_proportion, min_size)
+        signatures = grid.place_signatures(regions)
 
-            print(high_prob_region)
+        double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
 
-            regions = grid.create_regions(high_prob_region, samples, min_proportion, min_size)
-            print(regions)
+        regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures, outer_signature)
 
-            signatures = grid.place_signatures(regions)
+        tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
 
-            double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, cov_noise, hat_gmm.weights, regions)
 
+        for r in range(n_refinements):
+
+            regions = regions[:-1]
+            signatures = signatures[:-1]
+            regions, signatures = grid.refine_regions(regions, signatures, contributions, 1e-7)
+
+            double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
             regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures, outer_signature)
 
             tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
 
+            #print(contributions.max())
 
-            # for r in range(n_refinements):
-            #     regions, signatures = grid.refine_regions(regions, signatures, contributions, 1e-7)
-            #     regions = regions[:-1]
-            #     signatures = signatures[:-1]
-            #     double_hat_probs = proba.compute_signature_probabilities(regions, hat_gmm[1], hat_gmm[2], hat_gmm[0])
-            #     regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures,
-            #                                                              outer_signature)
-            #     print('Number of regions: ', len(regions))
-            #
-            #     tv_bound, contributions = bounds.compute_upper_bound_for_TV(signatures, regions, double_hat_probs,
-            #                                                                 var_noise, METHOD, params)
-            #
-            #print(contributions)
-            tv_bounds.append(tv_bound)
 
-    return tv_bounds, gmm_hitting_proba
+        tv_bounds.append(tv_bound)
 
     #plt.legend(loc='lower right')
 
-    #plt.xlim(1, 9)
-    #plt.ylim(0, 11)
-    #plt.xlabel('State[0]')
-    #plt.ylabel('State[1]')
-    #plt.grid(True)
-    #plt.show()
+    plt.xlim(1, 9)
+    plt.ylim(0, 11)
+    plt.xlabel('State[0]')
+    plt.ylabel('State[1]')
+    plt.grid(True)
+    plt.show()
+
+    return tv_bounds, gmm_hitting_proba

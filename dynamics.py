@@ -22,7 +22,7 @@ class _Dynamics:
         # Stack the min and max values along a new dimension
         return torch.stack([min_vals, max_vals], dim=1)
 
-    def compute_envelope_transform(self, distribution: _Distributions, signatures: torch.Tensor, envelopes: torch.Tensor):
+    def compute_envelopes_transform(self, distribution: _Distributions, signatures: torch.Tensor, envelopes: torch.Tensor):
 
         cov = distribution.covariance
         inv_cov = linalg.inv(cov)
