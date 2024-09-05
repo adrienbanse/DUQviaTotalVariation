@@ -1,10 +1,7 @@
+import parameters
+import barriers as barriers
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
-import barriers as barriers
-
-colors = ['Purples', 'Blues', 'Oranges', 'YlOrBr', 'YlOrRd',
-          'OrRd', 'PuRd', 'RdPu', 'BuPu', 'GnBu',
-          'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
 
 def monte_carlo_simulation(dynamics, initial_distribution, noise_distribution, barrier, n_simulations, n_samples):
 
@@ -23,7 +20,7 @@ def monte_carlo_simulation(dynamics, initial_distribution, noise_distribution, b
             states = dynamics(states)
             states = states + noise_distribution(n_samples) #additive noise
 
-        plt.hist2d(states[:, 0], states[:, 1], bins=100, cmap=colors[t], alpha=0.8, cmin=0.1)
+        plt.hist2d(states[:, 0], states[:, 1], bins=100, cmap=parameters.colors[t], alpha=0.8, cmin=0.1)
 
         hitting_proba = barriers.hitting_probability(states, barrier)
         hitting_probas.append(hitting_proba)

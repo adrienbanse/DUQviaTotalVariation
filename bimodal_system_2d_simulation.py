@@ -1,24 +1,11 @@
 import torch
-import barriers as barriers
-import grid_generation as grid
-import bounds_common as bounds
-import propagation_methods as propag
-import probability_mass_computation as proba
-import total_variation_bound as tv
+import parameters
 import monte_carlo
-
 import tv_bound_algorithm as algorithm
 
 from dynamics import LinearDynamics
 from distributions import GaussianMixture, Gaussian
 
-import numpy as np
-
-import matplotlib.pyplot as plt
-
-
-# Steps ahead for prediction
-n_steps_ahead = 3
 
 #Dynamics parameters
 A = torch.Tensor(
@@ -54,9 +41,9 @@ if __name__ == "__main__":
     initial_distribution = GaussianMixture(initial_means, initial_covariances, initial_weights)
     noise_distribution = Gaussian(mean_noise, cov_noise)
 
-    monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, 5, 10000)
+    monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, parameters.n_steps_ahead, parameters.n_samples)
 
-    #algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, barrier)
+    algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, barrier)
 
 
 

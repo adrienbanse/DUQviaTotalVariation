@@ -1,7 +1,7 @@
 import torch
 import math
-import grid_generation as grid
 import torch.linalg as linalg
+import grid_generation as grid
 
 from distributions import _Distributions
 

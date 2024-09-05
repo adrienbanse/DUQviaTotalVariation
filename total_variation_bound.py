@@ -1,9 +1,5 @@
 import torch
-import torch.linalg as linalg
 from torch.special import erf
-import math
-
-import grid_generation as grid
 
 def print_bound(func):
     def wrapper(*args, **kwargs):
@@ -11,11 +7,6 @@ def print_bound(func):
         print(f"TV bound at propag step: {result[0]}")
         return result
     return wrapper
-
-
-def check_if_region_is_bounded(region):
-    is_inf = torch.logical_or(torch.isinf(region[0]), torch.isinf(region[1]))
-    return not torch.any(is_inf)
 
 # ----------------------------------------------------------------------------------------- #
 # ------------------- TV upper bound (using the maximization approach) -------------------- #

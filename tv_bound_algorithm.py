@@ -1,21 +1,16 @@
 import torch
-import probability_mass_computation as proba
+import parameters
 import grid_generation as grid
 import total_variation_bound as tv
+import probability_mass_computation as proba
 
 import matplotlib.pyplot as plt
 
 from distributions import GaussianMixture
 
-n_samples = 10000
 
-min_proportion = 0.01
-min_size = 0.001
-n_refinements = 3
 
 unbounded_region = torch.Tensor([[torch.inf, torch.inf], [torch.inf, torch.inf]])  # a representation choice for the unbounded region
-
-n_steps_ahead = 3
 
 def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barrier):
 
@@ -29,7 +24,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
     #ax.add_patch(rect)
     cov_noise = noise_distribution.covariance
 
-    for t in range(n_steps_ahead + 1):
+    for t in range(parameters.n_steps_ahead + 1):
 
         if t == 0:
             hat_gmm = initial_distribution
@@ -42,13 +37,13 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
             proba_barrier = proba.gaussian_mixture_proba_mass_inside_hypercubes(hat_gmm.means, cov_noise, hat_gmm.weights, barrier.unsqueeze(0))
             gmm_hitting_proba.append(proba_barrier)
 
-        samples = hat_gmm(n_samples)
+        samples = hat_gmm(parameters.n_samples)
         plt.hist2d(samples[:, 0], samples[:, 1], bins=100, alpha=0.8, cmin=0.1)
 
         high_prob_region = grid.identify_high_prob_region(samples)
         outer_signature = grid.outer_point(high_prob_region)
 
-        regions = grid.create_regions(high_prob_region, samples, min_proportion, min_size)
+        regions = grid.create_regions(high_prob_region, samples, parameters.min_proportion, parameters.min_size)
         signatures = grid.place_signatures(regions)
 
         double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
@@ -58,11 +53,11 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
         tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
 
 
-        for r in range(n_refinements):
+        for r in range(parameters.n_refinements):
 
             regions = regions[:-1]
             signatures = signatures[:-1]
-            regions, signatures = grid.refine_regions(regions, signatures, contributions, 1e-7)
+            regions, signatures = grid.refine_regions(regions, signatures, contributions, parameters.threshold)
 
             double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
             regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures, outer_signature)
