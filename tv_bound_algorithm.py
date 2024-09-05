@@ -4,8 +4,6 @@ import grid_generation as grid
 import total_variation_bound as tv
 import probability_mass_computation as proba
 
-import matplotlib.pyplot as plt
-
 from distributions import GaussianMixture
 
 
@@ -15,14 +13,8 @@ unbounded_region = torch.Tensor([[torch.inf, torch.inf], [torch.inf, torch.inf]]
 def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barrier):
 
     tv_bounds = [0.0]
-    gmm_hitting_proba = [0.0]
+    gmms = []
 
-    fig, ax = plt.subplots()
-
-    #rect = Rectangle(barrier[0], barrier[1][0] - barrier[0][0], barrier[1][1] - barrier[0][1],
-    #                 edgecolor='red', facecolor='lightcoral', fill=True, lw=1, alpha=0.7, label='Unsafe set')
-    #ax.add_patch(rect)
-    cov_noise = noise_distribution.covariance
 
     for t in range(parameters.n_steps_ahead + 1):
 
@@ -33,12 +25,8 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
             covs_noise = noise_distribution.covariance.unsqueeze(0).expand(means_gmm.size(0), -1, -1)
             hat_gmm = GaussianMixture(means_gmm, covs_noise, double_hat_probs)
 
-            # Compute hitting probability
-            proba_barrier = proba.gaussian_mixture_proba_mass_inside_hypercubes(hat_gmm.means, cov_noise, hat_gmm.weights, barrier.unsqueeze(0))
-            gmm_hitting_proba.append(proba_barrier)
-
+        gmms.append(hat_gmm)
         samples = hat_gmm(parameters.n_samples)
-        plt.hist2d(samples[:, 0], samples[:, 1], bins=100, alpha=0.8, cmin=0.1)
 
         high_prob_region = grid.identify_high_prob_region(samples)
         outer_signature = grid.outer_point(high_prob_region)
@@ -64,18 +52,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
 
             tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
 
-            #print(contributions.max())
-
 
         tv_bounds.append(tv_bound)
 
-    #plt.legend(loc='lower right')
-
-    plt.xlim(1, 9)
-    plt.ylim(0, 11)
-    plt.xlabel('State[0]')
-    plt.ylabel('State[1]')
-    plt.grid(True)
-    plt.show()
-
-    return tv_bounds, gmm_hitting_proba
+    return tv_bounds, gmms

@@ -43,7 +43,9 @@ if __name__ == "__main__":
 
     monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, parameters.n_steps_ahead, parameters.n_samples)
 
-    algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, barrier)
+    tv_bounds, gmms = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, barrier)
+
+    gmm_hitting_probs = monte_carlo.gmm_approximation_monte_carlo(gmms, barrier, parameters.n_samples)
 
 
 
