@@ -63,18 +63,18 @@
 #
 #         return np.array([[min_f1, min_f2], [max_f1, max_f2]])
 #
-#     elif method == 'polynomial':
-#
-#         propagated_vertices = propag.systemDynamics(vertices, method, params)
-#
-#         #Compute min and max for each component
-#         min_f1, min_f2 = np.min(propagated_vertices, axis = 0)
-#         max_f1, max_f2 = np.max(propagated_vertices, axis = 0)
-#
-#         if grid.check_if_point_is_in_region(np.array([0, 0]), region):
-#             min_f2 = min(min_f2, 0)
-#
-#         return np.array([[min_f1, min_f2], [max_f1, max_f2]])
+    # elif method == 'polynomial':
+
+        # propagated_vertices = propag.systemDynamics(vertices, method, params)
+        #
+        # #Compute min and max for each component
+        # min_f1, min_f2 = np.min(propagated_vertices, axis = 0)
+        # max_f1, max_f2 = np.max(propagated_vertices, axis = 0)
+        #
+        # if grid.check_if_point_is_in_region(np.array([0, 0]), region):
+        #     min_f2 = min(min_f2, 0)
+        #
+        # return np.array([[min_f1, min_f2], [max_f1, max_f2]])
 #
 #     elif method == 'dubin':
 #
