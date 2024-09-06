@@ -39,7 +39,7 @@ def monte_carlo_simulation(dynamics, initial_distribution, noise_distribution, b
 
 def gmm_approximation_monte_carlo(gmms, barrier, n_samples):
 
-    gmm_hitting_probs = [0.0]
+    gmm_hitting_probs = []
 
     fig, ax = plt.subplots()
 
@@ -51,7 +51,7 @@ def gmm_approximation_monte_carlo(gmms, barrier, n_samples):
 
         # Compute hitting probability
         proba_barrier = proba.gaussian_mixture_proba_mass_inside_hypercubes(gmm.means, gmm.covariances[0], gmm.weights, barrier.unsqueeze(0))
-        gmm_hitting_probs.append(proba_barrier)
+        gmm_hitting_probs.append(proba_barrier.item())
 
         samples = gmm(n_samples)
 

@@ -46,6 +46,7 @@ if __name__ == "__main__":
     print(f"Final TV bounds: {tv_bounds}")
 
     gmm_hitting_probs = monte_carlo.gmm_approximation_monte_carlo(gmms, barrier, parameters.n_samples)
+    print(f"GMM hitting probs: {gmm_hitting_probs}")
 
 
 
