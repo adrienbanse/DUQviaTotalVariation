@@ -129,7 +129,7 @@ def condition(region, samples, min_proportion, min_size, max_depth, current_dept
     proportion = torch.mean(inside.float())
 
     if grid_type == "uniform_grid":
-        return proportion > min_proportion and current_depth <= max_depth
+        return current_depth <= max_depth
     else:
         return proportion > min_proportion
 
