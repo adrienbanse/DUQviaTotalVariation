@@ -40,7 +40,9 @@ if __name__ == "__main__":
 
     monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, parameters.n_steps_ahead, parameters.n_samples)
 
-    tv_bounds, gmms = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution)
+    tv_bounds_time_step, gmms = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution)
+    tv_bounds = torch.cumsum(tv_bounds_time_step, dim=0)
+    print(f"Final TV bounds: {tv_bounds}")
 
     gmm_hitting_probs = monte_carlo.gmm_approximation_monte_carlo(gmms, barrier, parameters.n_samples)
 

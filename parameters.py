@@ -1,5 +1,5 @@
 #Time horizon
-n_steps_ahead = 3
+n_steps_ahead = 5
 
 #Monte Carlo simulation
 n_samples = 10000
@@ -10,7 +10,7 @@ min_size = 0.001
 
 #Refinement
 threshold = 1e-7
-n_refinements = 2
+n_refinements = 3
 
 #Plot
 colors = ['Purples', 'Blues', 'Oranges', 'YlOrBr', 'YlOrRd', 'OrRd', 'PuRd', 'RdPu', 'BuPu', 'GnBu', 'PuBu', 'YlGnBu', 'PuBuGn', 'BuGn', 'YlGn']
