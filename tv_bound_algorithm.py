@@ -7,7 +7,7 @@ import probability_mass_computation as proba
 from distributions import GaussianMixture
 
 
-def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution):
+def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, grid_type):
 
     tv_bounds = [0.0]
     gmms = []
@@ -29,7 +29,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution):
             high_prob_region = grid.identify_high_prob_region(samples)
             outer_signature = grid.outer_point(high_prob_region)
 
-            regions = grid.create_regions(high_prob_region, samples, parameters.min_proportion, parameters.min_size)
+            regions = grid.create_regions(high_prob_region, samples, parameters.min_proportion, parameters.min_size, parameters.max_depth, 0, grid_type)
             signatures = grid.place_signatures(regions)
 
             double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances

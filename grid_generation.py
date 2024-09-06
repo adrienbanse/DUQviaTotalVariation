@@ -107,33 +107,37 @@ def split_region(region):
     return torch.stack(subregions, dim=0)
 
 
-def recursive_partition(region, condition_fn, samples, min_proportion, min_size):
-    if condition_fn(region, samples, min_proportion, min_size):
+def recursive_partition(region, condition_fn, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+    if condition_fn(region, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
         # Split the region into 2^d smaller regions
         subregions = split_region(region)
         result_regions = []
         for subregion in subregions:
-            result_regions.append(recursive_partition(subregion, condition_fn, samples, min_proportion, min_size))
+            result_regions.append(recursive_partition(subregion, condition_fn, samples, min_proportion, min_size, max_depth, current_depth+1, grid_type))
         return torch.cat(result_regions, dim=0)
     else:
         # Base case: condition is not met, return the region itself
         return region.unsqueeze(0)
 
 
-def generate_regions(macro_region, condition_fn, samples, min_proportion, min_size):
-    return recursive_partition(macro_region, condition_fn, samples, min_proportion, min_size)
+def generate_regions(macro_region, condition_fn, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+    return recursive_partition(macro_region, condition_fn, samples, min_proportion, min_size, max_depth, current_depth, grid_type)
 
-def condition(region, samples, min_proportion, min_size):
+def condition(region, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
     min_bound, max_bound = region
     inside = (samples >= min_bound).all(dim=1) & (samples <= max_bound).all(dim=1)
     proportion = torch.mean(inside.float())
 
-    return proportion > min_proportion
+    if grid_type == "uniform_grid":
+        return proportion > min_proportion and current_depth <= max_depth
+    else:
+        return proportion > min_proportion
+
 
 @print_size
-def create_regions(high_prob_region, samples, min_proportion, min_size):
+def create_regions(high_prob_region, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
 
-    regions = generate_regions(high_prob_region, condition, samples, min_proportion, min_size)
+    regions = generate_regions(high_prob_region, condition, samples, min_proportion, min_size, max_depth, current_depth, grid_type)
 
     return regions
 
@@ -161,25 +165,3 @@ def refine_regions(regions, signatures, contributions, threshold):
     refined_signatures = place_signatures(refined_regions)
 
     return refined_regions, refined_signatures
-
-
-# def subdivide_region_uniformly(region, n):
-#     x_min = min(region[0][0], region[1][0])
-#     x_max = max(region[0][0], region[1][0])
-#     y_min = min(region[0][1], region[1][1])
-#     y_max = max(region[0][1], region[1][1])
-#
-#     x_interval = (x_max - x_min) / n
-#     y_interval = (y_max - y_min) / n
-#
-#     partitions = []
-#
-#     for i in range(n):
-#         for j in range(n):
-#             x_start = x_min + i * x_interval
-#             x_end = x_start + x_interval
-#             y_start = y_min + j * y_interval
-#             y_end = y_start + y_interval
-#             partitions.append([[x_start, y_start], [x_end, y_end]])
-#
-#     return partitions
