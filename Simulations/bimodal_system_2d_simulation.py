@@ -7,7 +7,7 @@ from dynamics import LinearDynamics
 from distributions import GaussianMixture, Gaussian
 
 
-#Dynamics parameters
+# Dynamics parameters
 A = torch.Tensor(
         [
             [0.84, 0.1],
