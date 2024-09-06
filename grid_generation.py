@@ -30,9 +30,12 @@ def outer_point(macro_region: torch.Tensor):
     return outer_point
 
 
-def add_unbounded_representations(regions, unbounded_region, signatures, outer_signature):
+def add_unbounded_representations(regions, signatures, outer_signature):
 
-    regions = torch.cat((regions, unbounded_region.unsqueeze(0)))
+    r, d = regions.shape[1], regions.shape[-1]
+    unbounded_region = torch.full((1, r, d), torch.inf)
+
+    regions = torch.cat((regions, unbounded_region))
     signatures = torch.cat((signatures, outer_signature.unsqueeze(0)))
 
     return regions, signatures

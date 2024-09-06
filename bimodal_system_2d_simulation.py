@@ -26,9 +26,6 @@ mean_noise = torch.Tensor([0, 0])
 sigma_noise = 0.01
 cov_noise = sigma_noise * torch.eye(2)  # Assumes uncorrelation (this could be relaxed in further upgrades)
 
-# Unbounded region (arbitrary definition)
-unbounded_region = torch.Tensor([[torch.inf, torch.inf], [torch.inf, torch.inf]])  # a representation choice for the unbounded region
-
 # Barrier (unsafe set)
 barrier = torch.Tensor([[3.5, 2.0], [4.5, 3.0]])
 
@@ -43,7 +40,7 @@ if __name__ == "__main__":
 
     monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, parameters.n_steps_ahead, parameters.n_samples)
 
-    tv_bounds, gmms = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, barrier)
+    tv_bounds, gmms = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution)
 
     gmm_hitting_probs = monte_carlo.gmm_approximation_monte_carlo(gmms, barrier, parameters.n_samples)
 

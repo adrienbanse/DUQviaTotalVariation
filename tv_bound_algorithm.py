@@ -7,10 +7,7 @@ import probability_mass_computation as proba
 from distributions import GaussianMixture
 
 
-
-unbounded_region = torch.Tensor([[torch.inf, torch.inf], [torch.inf, torch.inf]])  # a representation choice for the unbounded region
-
-def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barrier):
+def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution):
 
     tv_bounds = [0.0]
     gmms = []
@@ -36,7 +33,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
 
         double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
 
-        regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures, outer_signature)
+        regions, signatures = grid.add_unbounded_representations(regions, signatures, outer_signature)
 
         tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
 
@@ -48,7 +45,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, barri
             regions, signatures = grid.refine_regions(regions, signatures, contributions, parameters.threshold)
 
             double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
-            regions, signatures = grid.add_unbounded_representations(regions, unbounded_region, signatures, outer_signature)
+            regions, signatures = grid.add_unbounded_representations(regions, signatures, outer_signature)
 
             tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
 
