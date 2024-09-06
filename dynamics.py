@@ -14,13 +14,16 @@ class _Dynamics:
     def compute_hypercube_envelopes(self, regions):
 
         vertices = grid.get_vertices(regions)
-        propagated_vertices = self(vertices)
+
+        #TODO: Is there a better way to compute this below?
+        n, d = vertices.shape[0], vertices.shape[-1]
+        propagated_vertices = torch.stack([self(vert) for vert in vertices.reshape(-1, d)]).reshape(n, 2**d, d)
 
         min_vals, _ = torch.min(propagated_vertices, dim=1)
         max_vals, _ = torch.max(propagated_vertices, dim=1)
 
-        # Stack the min and max values along a new dimension
-        return torch.stack([min_vals, max_vals], dim=1)
+        envelopes = torch.stack([min_vals, max_vals], dim=1)
+        return envelopes
 
     def compute_envelopes_transform(self, distribution: _Distributions, signatures: torch.Tensor, envelopes: torch.Tensor):
 
