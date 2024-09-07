@@ -63,6 +63,11 @@ class PolynomialDynamics(_Dynamics):
         self.h = h
 
     def __call__(self, x: torch.Tensor):
+
+        #TODO: Check
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+
         component_1 = x[:, 0] + 1.25 * self.h * x[:, 1]
         component_2 = 1.4 * x[:, 1] + self.h * 0.3 * (0.25 * x[:, 0] ** 2 - 0.4 * x[:, 0] * x[:, 1] + 0.25 * x[:, 1] ** 2)
 
@@ -80,6 +85,13 @@ class PolynomialDynamics(_Dynamics):
         max_vals, _ = torch.max(propagated_vertices, dim=1)
 
         envelopes = torch.stack([min_vals, max_vals], dim=1)
+
+        # TODO: Is there a better way to compute this below?
+        # TODO: Check
+        for i, region in enumerate(regions):
+            if grid.check_if_point_is_in_region(torch.Tensor([0, 0]), region):
+                envelopes[i][0][1] = 0
+
         return envelopes
 
 

@@ -87,7 +87,8 @@ def check_if_point_is_in_region(point, region):
     upper_extremities = region[1]
 
     inside = (point >= lower_extremities) & (point <= upper_extremities)
-    return inside.all(dim=1)
+
+    return inside.all(dim=0)
 
 
 # ----------------------------------------------------------------------------------------- #
