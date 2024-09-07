@@ -3,7 +3,14 @@ import torch
 def print_size(func):
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        print(f"Number of regions: {result.size(0)}")
+        print(f"GMM Size: {result.size(0)}")
+        return result
+    return wrapper
+
+def print_size_refinement(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        print(f"GMM Size: {result[0].size(0)}")
         return result
     return wrapper
 
@@ -82,14 +89,6 @@ def identify_high_prob_region(samples: torch.Tensor):
     return torch.stack((min_point, max_point), dim=0)
 
 
-def check_if_point_is_in_region(point, region):
-    lower_extremities = region[0]
-    upper_extremities = region[1]
-
-    inside = (point >= lower_extremities) & (point <= upper_extremities)
-
-    return inside.all(dim=0)
-
 
 # ----------------------------------------------------------------------------------------- #
 # ------------------------------------ Recursive grid ------------------------------------- #
@@ -142,7 +141,7 @@ def create_regions(high_prob_region, samples, min_proportion, min_size, max_dept
 
     return regions
 
-
+@print_size_refinement
 def refine_regions(regions, signatures, contributions, threshold):
 #TODO: Vectorize this method
 
