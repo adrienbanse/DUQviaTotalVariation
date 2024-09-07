@@ -11,14 +11,14 @@ from distributions import GaussianMixture, Gaussian
 
 # Initial distribution parameters
 initial_weights = torch.Tensor([1.0, 0.0])
-initial_means = torch.Tensor([[0.9, 0.9], [0, 0]])
-sigma = 0.005
+initial_means = torch.Tensor([[1.0, 1.0], [0, 0]])
+sigma = 0.002
 cov = sigma * torch.eye(2)
 initial_covariances = torch.stack((cov, cov), dim=0)
 
 # Noise
 mean_noise = torch.Tensor([0, 0])
-sigma_noise = 0.001
+sigma_noise = 0.1
 cov_noise = sigma_noise * torch.eye(2)  # Assumes uncorrelation (this could be relaxed in further upgrades)
 
 # Barrier (unsafe set)
