@@ -1,7 +1,4 @@
-import numpy as np
-import multiprocessing
-from scipy import special
-from functools import partial
+import torch
  
 from time import time
 def timer_func(func):
@@ -20,86 +17,54 @@ def timer_func(func):
 # ------------------------ Gaussian probability mass inside hypercube --------------------- #
 # ----------------------------------------------------------------------------------------- #
  
-def erf_factor(mean, variance, region_min, region_max):
-    sqrt2var = np.sqrt(2 * variance)
-    scaled_min = (mean - region_min) / sqrt2var
-    scaled_max = (mean - region_max) / sqrt2var
+def erf_factor(means: torch.Tensor, covs: torch.Tensor, regions_min: torch.Tensor, regions_max: torch.Tensor):
 
-    # Be careful! The difference between two erfs is not
-    # numerically stable like this. But it is good for perf.
-    return special.erf(scaled_min) - special.erf(scaled_max)
- 
- 
-def gaussianProbaMassInsideHypercube(means, var, cube):
-    # Assuming cube = [x_lower, x_upper] where each is an n-dimensional vector
-    # Assume mean and var are n-dimensional vectors
- 
-    factor = 1/(2**means.shape[-1])
+    means_broadcast = means.unsqueeze(0)  # Shape: (1, num_components, dimension)
 
-    #factor = 1/4
-    # erf_factor works vectors (all the functions take vectors as input)
-    # It also works if mean or var are scalar while min and max 
-    # are vectors. See more about broadcast semantics here:
-    # https://numpy.org/doc/stable/user/basics.broadcasting.html
-    erfs = erf_factor(means, var, cube[0], cube[1])
+    variances = covs.diagonal(dim1=-2, dim2=-1)  # Take diagonal values of covariance
+    variances_broadcast = variances.unsqueeze(0)  # shape: (1, num_components, dimension)
+
+    regions_min_broadcast = regions_min.unsqueeze(1)  # Shape: (num_regions, 1, dimension)
+    regions_max_broadcast = regions_max.unsqueeze(1)  # Shape: (num_regions, 1, dimension)
+
+    # Broadcast and compute scaled_min and scaled_max
+    scaled_mins = (means_broadcast - regions_min_broadcast) / torch.sqrt(2 * variances_broadcast)
+    scaled_maxs = (means_broadcast - regions_max_broadcast) / torch.sqrt(2 * variances_broadcast)
+
+    return torch.special.erf(scaled_mins) - torch.special.erf(scaled_maxs)
  
-    return factor * erfs.prod(axis=-1)
+ 
+def gaussian_proba_mass_inside_hypercubes(means, covs, regions):
+
+    factor = 1/(2 ** means.shape[-1])
+
+    regions_min = regions[:, 0, :]  # Extracting min bounds for all regions
+    regions_max = regions[:, 1, :]  # Extracting max bounds for all regions
+
+    erfs = erf_factor(means, covs, regions_min, regions_max)
+ 
+    return factor * erfs.prod(dim=-1)
  
  
-def gmmProbabilityMassInsideRegion(weights, means, var, region):
-    # Assume means has size [m, n] where n is the dimensionality of
-    # the region and m is the number of segments#
-    # Assume weights has size [m]
-    # Assume var has size [n] - could also have [m, n], the code is the same
-    # Assume region is a tuple of ([n], [n])
-    
-    proba_segment = gaussianProbaMassInsideHypercube(means, var, region)
-    
-    proba_region = (weights[: np.newaxis] * proba_segment).sum()
-    print(proba_region)
+def gaussian_mixture_proba_mass_inside_hypercubes(means, cov, weights, regions):
+
+    covs = cov.unsqueeze(0).expand(means.size(0), -1, -1)
+
+    proba_segment = gaussian_proba_mass_inside_hypercubes(means, covs, regions)
+    proba_region = (weights * proba_segment).sum(dim=-1)
     
     return proba_region
  
  
 @timer_func
-def computeSignatureProbabilitiesInParallel(regions, means, cov, weights):
-    #Assumes a GMM where the components are described by means and covs(initial step becomes a GMM w/ 1 component)
-    #RECALL THAT THE COVARIANCE IS THE SAME FOR ALL CONDITIONAL DIST IN THIS CASE
-    #This can be more generic for other cases
- 
-    partial_function = partial(gmmProbabilityMassInsideRegion, weights, means, cov)
- 
-    # multiprocessing pool object
-    pool = multiprocessing.Pool()
- 
-    # pool object with number of element
-    pool = multiprocessing.Pool(processes = 10)
- 
-    signature_probas = pool.map(partial_function, regions)
+def compute_signature_probabilities(means, cov, weights, regions):
 
-    signature_probas = np.array(signature_probas)
+    signature_probas = gaussian_mixture_proba_mass_inside_hypercubes(means, cov, weights, regions)
 
     # the remaining probability is attributed to the whole unbounded region
-    unbounded_proba = 1 - signature_probas.sum()
-    signature_probas = np.concatenate((signature_probas, [unbounded_proba]))
-      
+    unbounded_proba = torch.Tensor([1 - signature_probas.sum()])
+    signature_probas = torch.cat((signature_probas, unbounded_proba))
+
     return signature_probas
 
-
-# def computeSignatureProbabilities(regions, means, cov, weights):
-#     #Assumes a GMM where the components are described by means and covs(initial step becomes a GMM w/ 1 component)
-#     #RECALL THAT THE COVARIANCE IS THE SAME FOR ALL CONDITIONAL DIST IN THIS CASE
-#     #This can be more generic for other cases 
-    
-#     signature_probas = []
-
-#     for region in regions:
-        
-#         proba_segment = gaussianProbaMassInsideHypercube(means, cov, region)
-    
-#         proba_region = (weights[: np.newaxis] * proba_segment).sum()
-        
-#         signature_probas.append(proba_region)
-    
-#     return signature_probas
 

@@ -1,79 +1,49 @@
-import numpy as np
-import math
-from scipy.stats import norm
+import torch
 
-import propagation_methods as propag
-import bounds_linear_system_2d as bounds_linear
-
-def print_array_size(func):
+def print_size(func):
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        print(f"Number of signatures: {len(result)}")
+        print(f"GMM Size: {result.size(0)}")
+        return result
+    return wrapper
+
+def print_size_refinement(func):
+    def wrapper(*args, **kwargs):
+        result = func(*args, **kwargs)
+        print(f"GMM Size: {result[0].size(0)}")
         return result
     return wrapper
 
 # ----------------------------------------------------------------------------------------- #
 # ---------------------------------- Grid generation -------------------------------------- #
 # ----------------------------------------------------------------------------------------- #
+def place_signatures(bounded_regions: torch.Tensor):
 
-def generate_regions(*lists):
-    if len(lists) == 0:
-        return []
+    r_min = bounded_regions[:, 0, :]
+    r_max = bounded_regions[:, 1, :]
 
-    # Get the lengths of each list
-    lengths = [len(lst) for lst in lists]
-
-    # Create slices for each list
-    slices = [slice(None)] * len(lists)
-    regions = []
-
-    # Recursive function to generate regions
-    def generate_region(slice_indices):
-        if len(slice_indices) == len(lists):
-            region = np.array([[lst[i-1], lst[i]] for lst, i in zip(lists, slice_indices)])
-            regions.append(region.T)
-        else:
-            for i in range(1, lengths[len(slice_indices)]):
-                new_slice_indices = slice_indices + [i]
-                generate_region(new_slice_indices)
-
-    generate_region([])
-
-    return np.array(regions)
+    return r_min + (r_max - r_min) / 2
 
 
-def computeOuterPoint(region):
-    dimensions = len(region[0])  # Get the number of dimensions
-    max_coords = [max(region[i][d] for i in range(len(region))) for d in range(dimensions)]
-    min_coords = [min(region[i][d] for i in range(len(region))) for d in range(dimensions)]
-    
-    # Choose a point close to the upper face
-    outer_point = [(min_coords[d] + max_coords[d]) / 2 if d != dimensions - 1 else max_coords[d] + 1e-2 for d in range(dimensions)]
-    
-    return np.array(outer_point)
+def outer_point(macro_region: torch.Tensor):
+    dimensions = macro_region.size(1)
+
+    # Calculate max and min coordinates along each dimension
+    max_coords, _ = torch.max(macro_region, dim=0)
+    min_coords, _ = torch.min(macro_region, dim=0)
+
+    # Choose a point close to an arbitrary face
+    outer_point = torch.where(torch.arange(dimensions) != dimensions - 1, (min_coords + max_coords) / 2, max_coords + 1e-1)
+    return outer_point
 
 
-def computePosition(minimum, maximum):
-    return minimum + (maximum - minimum) / 2
+def add_unbounded_representations(regions, signatures, outer_signature):
 
+    r, d = regions.shape[1], regions.shape[-1]
+    unbounded_region = torch.full((1, r, d), torch.inf)
 
-def placeSignatures(bounded_regions):
-    
-    # Extract dimensions of regions
-    num_regions, _, num_dimensions = bounded_regions.shape
-
-    # Compute signature points for all bounded regions
-    signature_points = np.empty((num_regions, num_dimensions))
-    for dim in range(num_dimensions):
-        signature_points[:, dim] = computePosition(bounded_regions[:, 0, dim], bounded_regions[:, 1, dim])
-
-    return signature_points
-
-
-def addUnboundedRepresentations(regions, unbounded_region, signatures, outer_signature):
-
-    regions = np.concatenate((regions, [unbounded_region]))
-    signatures = np.concatenate((signatures, [outer_signature]))
+    regions = torch.cat((regions, unbounded_region))
+    signatures = torch.cat((signatures, outer_signature.unsqueeze(0)))
 
     return regions, signatures
 
@@ -83,145 +53,115 @@ def addUnboundedRepresentations(regions, unbounded_region, signatures, outer_sig
 # --------------------------------- Vertices of the grid ---------------------------------- #
 # ----------------------------------------------------------------------------------------- #
 
-def getVertices(cube):
-    
-    dimensions = len(cube[0])  # Get the dimension of the cube
-    vertices = []
+def get_vertices(hypercubes: torch.Tensor):
 
-    for i in range(2 ** dimensions):
-        vertex = []
-        for j in range(dimensions):
-            if (i >> j) & 1:
-                vertex.append(cube[1][j])  # Use max value for this dimension
-            else:
-                vertex.append(cube[0][j])  # Use min value for this dimension
-        vertices.append(vertex)
+    if hypercubes.dim() == 2:  #If hypercubes contains only one hypercube
+        hypercubes = hypercubes.unsqueeze(0)
 
-    return np.array(vertices)
+    n, _, dimensions = hypercubes.size()
+
+    # Generate all possible combinations of 0s and 1s
+    combinations = torch.cartesian_prod(*[torch.tensor([0, 1])] * dimensions).float()
+
+    combinations = combinations.unsqueeze(0).expand(n, -1, -1)
+
+    # Determine which dimensions are min or max
+    min_values = hypercubes[:, 0, :]  # (n, d)
+    max_values = hypercubes[:, 1, :]  # (n, d)
+
+    # Compute vertices
+    vertices = combinations * max_values.unsqueeze(1) + (1 - combinations) * min_values.unsqueeze(1)  # (n, 2^d, d)
+
+    return vertices
+
+def get_centered_region(regions, points):
+
+    points = points.unsqueeze(1)
+
+    return torch.sub(regions, points)
 
 
-def findMinMaxPoints(samples):
+def identify_high_prob_region(samples: torch.Tensor):
 
-    min_point = np.min(samples, axis=0)
-    max_point = np.max(samples, axis=0)
+    min_point = torch.min(samples, dim=0).values
+    max_point = torch.max(samples, dim=0).values
 
-    return min_point, max_point
+    return torch.stack((min_point, max_point), dim=0)
 
-
-def checkIfPointIsInRegion(point, region):
-    return np.all(point >= region[0]) and np.all(point <= region[1])
-
-def getCenteredRegion(region, point):
-    return region - point
 
 
 # ----------------------------------------------------------------------------------------- #
 # ------------------------------------ Recursive grid ------------------------------------- #
 # ----------------------------------------------------------------------------------------- #
-def euclideanDistance(point1, point2):
-    return np.sqrt(np.sum(point1 - point2) ** 2)
-
-def regionSize(region):
-    
-    vertices = getVertices(region)
-    distance = euclideanDistance(vertices[0], vertices[-1])
-
-    return distance
-
-def pointInsideRegion(point, cube):    
-    min_bound, max_bound = cube
-    if np.any(point < min_bound) or np.any(point > max_bound):
-        return False
-    return True
-
-def checkProportionInsideRegion(points, cube):
-    min_bound, max_bound = cube
-    return np.mean((np.all(points >= min_bound, axis=1)) & (np.all(points <= max_bound, axis=1)))
-
-
-def check_condition(region, samples, min_proportion, min_size):
-    condition_proportion = checkProportionInsideRegion(samples, region) > min_proportion
-    condition_size = regionSize(region) > min_size
-
-    return condition_proportion & condition_size
-
-
-def subdivideRegion(region, samples, min_proportion, min_size):
+def split_region(region):
+    min_corner, max_corner = region[0], region[1]
+    mid_point = (min_corner + max_corner) / 2
     subregions = []
-    if check_condition(region, samples, min_proportion, min_size):
-        
-        # If condition is true, subdivide the region in half
-        num_dimensions = len(region[0])
-        midpoints = np.mean(region, axis=0)
 
-        # Generate binary sequences for all possible subdivisions
-        for i in range(2 ** num_dimensions):
-            coords = np.empty_like(region)
-            for j in range(num_dimensions):
-                min_val = region[0][j]
-                max_val = region[1][j]
-                mid_val = midpoints[j]
-                if i & (1 << j):
-                    coords[:, j] = np.array([mid_val, max_val])
-                else:
-                    coords[:, j] = np.array([min_val, mid_val])
-            subregions.extend(subdivideRegion(coords, samples, min_proportion, min_size))
+    for i in range(2 ** region.shape[1]):
+        binary_representation = torch.tensor([int(x) for x in bin(i)[2:].zfill(region.shape[1])])
+        new_min_corner = torch.where(binary_representation == 0, min_corner, mid_point)
+        new_max_corner = torch.where(binary_representation == 0, mid_point, max_corner)
+        subregions.append(torch.stack([new_min_corner, new_max_corner], dim=0))
 
+    return torch.stack(subregions, dim=0)
+
+
+def recursive_partition(region, condition_fn, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+    if condition_fn(region, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+        # Split the region into 2^d smaller regions
+        subregions = split_region(region)
+        result_regions = []
+        for subregion in subregions:
+            result_regions.append(recursive_partition(subregion, condition_fn, samples, min_proportion, min_size, max_depth, current_depth+1, grid_type))
+        return torch.cat(result_regions, dim=0)
     else:
-        # If condition is false, append the region to the list of subregions
-        subregions.append(region)
-    return subregions
+        # Base case: condition is not met, return the region itself
+        return region.unsqueeze(0)
 
 
-def refineRegions(regions, signatures, contributions, threshold):
-    new_regions = []
-    new_signatures = []
+def generate_regions(macro_region, condition_fn, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+    return recursive_partition(macro_region, condition_fn, samples, min_proportion, min_size, max_depth, current_depth, grid_type)
+
+def condition(region, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+    min_bound, max_bound = region
+    inside = (samples >= min_bound).all(dim=1) & (samples <= max_bound).all(dim=1)
+    proportion = torch.mean(inside.float())
+
+    if grid_type == "uniform_grid":
+        return current_depth <= max_depth
+    else:
+        return proportion > min_proportion
+
+
+@print_size
+def create_regions(high_prob_region, samples, min_proportion, min_size, max_depth, current_depth, grid_type):
+
+    regions = generate_regions(high_prob_region, condition, samples, min_proportion, min_size, max_depth, current_depth, grid_type)
+
+    return regions
+
+@print_size_refinement
+def refine_regions(regions, signatures, contributions, threshold):
+#TODO: Vectorize this method
+
+    refined_regions = []
+    contributions = contributions[:-1] #Remove contribution from unbounded region
 
     for i, contribution in enumerate(contributions):
-        if contribution > threshold and not np.isinf(regions[i][0][0]):
-            num_dimensions = regions[i].shape[1]  # Get the number of dimensions
 
-            # Calculate midpoints for each dimension
-            midpoints = np.mean(regions[i], axis=0)
+        if contribution > threshold:
 
-            # Generate binary sequences for all possible subdivisions
-            for j in range(2 ** num_dimensions):
-                coords = np.empty_like(regions[i])
-                for k in range(num_dimensions):
-                    if j & (1 << k):
-                        coords[:, k] = np.array([midpoints[k], regions[i][1][k]])
-                    else:
-                        coords[:, k] = np.array([regions[i][0][k], midpoints[k]])
-                new_regions.append(coords)
-                
-                # Calculate signatures for each subregion
-                sub_sig = np.mean(coords, axis=0)
-                new_signatures.append(sub_sig)
+            region_to_transform = regions[i]
+            replacement_regions = split_region(region_to_transform)
+
+            refined_regions.append(replacement_regions)
+
         else:
-            new_regions.append(regions[i])
-            new_signatures.append(signatures[i])
+            refined_regions.append(regions[i])
 
-    return np.array(new_regions), np.array(new_signatures)
+    refined_regions = [t.unsqueeze(0) if t.ndim == 2 else t for t in refined_regions]
+    refined_regions = torch.cat(refined_regions, dim=0)
+    refined_signatures = place_signatures(refined_regions)
 
-
-
-def subdivideRegionUniformly(region, n):
-    x_min = min(region[0][0], region[1][0])
-    x_max = max(region[0][0], region[1][0])
-    y_min = min(region[0][1], region[1][1])
-    y_max = max(region[0][1], region[1][1])
-    
-    x_interval = (x_max - x_min) / n
-    y_interval = (y_max - y_min) / n
-    
-    partitions = []
-    
-    for i in range(n):
-        for j in range(n):
-            x_start = x_min + i * x_interval
-            x_end = x_start + x_interval
-            y_start = y_min + j * y_interval
-            y_end = y_start + y_interval
-            partitions.append([[x_start, y_start], [x_end, y_end]])
-    
-    return partitions
+    return refined_regions, refined_signatures

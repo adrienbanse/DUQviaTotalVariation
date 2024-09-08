@@ -1,69 +1,28 @@
-import numpy as np
-
+import torch
 
 def print_proportion(func):
     def wrapper(*args, **kwargs):
         result = func(*args, **kwargs)
-        print(f"Hitting proba: {result}")
+        print(f"Hitting probability: {result:.4f}")
         return result
     return wrapper
 
 
+def check_if_inside_barrier(state: torch.Tensor, barrier: torch.Tensor):
 
-def generate_barriers(*lists):
-    if len(lists) == 0:
-        return []
+    lower_extremities = barrier[0]
+    upper_extremities = barrier[1]
 
-    # Get the lengths of each list
-    lengths = [len(lst) for lst in lists]
+    inside = (state >= lower_extremities) & (state <= upper_extremities)
+    return inside.all(dim=1)
 
-    # Create slices for each list
-    slices = [slice(None)] * len(lists)
-    regions = []
-
-    # Recursive function to generate regions
-    def generate_region(slice_indices):
-        if len(slice_indices) == len(lists):
-            region = np.array([[lst[i-1], lst[i]] for lst, i in zip(lists, slice_indices)])
-            regions.append(region.T)
-        else:
-            for i in range(1, lengths[len(slice_indices)]):
-                new_slice_indices = slice_indices + [i]
-                generate_region(new_slice_indices)
-
-    generate_region([])
-
-    return np.array(regions)
-
-
-def createBarrier(region_limits):
-    
-    dimension = region_limits.shape[-1]
-
-    separations = []
-
-    #Generate separations for non-infinite limits
-    separations = [
-        np.array([region_limits[0][n], region_limits[1][n]])
-        for n in range(dimension)
-    ]
-
-    regions = generate_barriers(*separations)
-
-    return regions
-
-
-def verifyIfInsideBarrier(state, barrier):
-
-    for dim in range(len(state)):
-        if not (barrier[0][dim] <= state[dim] <= barrier[1][dim]):
-            return False
-    return True
 
 @print_proportion
-def hittingProbabilityMC(states, barrier):
-    
-    states_inside_barrier = sum(verifyIfInsideBarrier(state, barrier) for state in states)
-    proportion = states_inside_barrier / len(states)
+def hitting_probability(states: torch.Tensor, barrier: torch.Tensor):
+
+    inside_barrier = check_if_inside_barrier(states, barrier)
+    states_inside_barrier = inside_barrier.sum().item()
+    proportion = states_inside_barrier / states.size(0)
+
     return proportion
 
