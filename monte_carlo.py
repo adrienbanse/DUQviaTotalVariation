@@ -29,11 +29,11 @@ def monte_carlo_simulation(dynamics, initial_distribution, noise_distribution, b
         hitting_proba = barriers.hitting_probability(states, barrier)
         hitting_probas.append(hitting_proba)
 
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right', fontsize=15)
     plt.xlim(1, 9)
     plt.ylim(0, 11)
-    plt.xlabel('State[0]')
-    plt.ylabel('State[1]')
+    plt.xlabel('State[0]', fontsize=15)
+    plt.ylabel('State[1]', fontsize=15)
     plt.grid(True)
     plt.show()
 
@@ -65,12 +65,12 @@ def mixture_approximation_monte_carlo(mixtures, barrier, n_samples):
         plt.hist2d(samples[:, 0], samples[:, 1], bins=100, alpha=0.8, cmin=0.1)
 
 
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right', fontsize=15)
 
     plt.xlim(1, 9)
     plt.ylim(0, 11)
-    plt.xlabel('State[0]')
-    plt.ylabel('State[1]')
+    plt.xlabel('State[0]', fontsize=15)
+    plt.ylabel('State[1]', fontsize=15)
     plt.grid(True)
     plt.show()
 

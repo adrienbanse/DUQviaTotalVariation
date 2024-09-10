@@ -10,20 +10,20 @@ from distributions import GaussianMixture, Gaussian
 # Dynamics parameters
 A = torch.Tensor(
         [
-            [0.84, 0.1],
+            [0.84, 0.10],
             [0.05, 0.72]
         ])
 
 # Initial distribution parameters
 initial_weights = torch.Tensor([0.5, 0.5])
-initial_means = torch.Tensor([[8, 10], [6, 10]])
+initial_means = torch.Tensor([[6, 10], [8, 10]])
 sigma = 0.005
 cov = sigma * torch.eye(2)
 initial_covariances = torch.stack((cov, cov), dim=0)
 
 # Noise
 mean_noise = torch.Tensor([0, 0])
-sigma_noise = 0.01
+sigma_noise = 0.03
 cov_noise = sigma_noise * torch.eye(2)  # Assumes uncorrelation (this could be relaxed in further upgrades)
 
 # Barrier (unsafe set)
