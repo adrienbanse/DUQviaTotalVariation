@@ -2,28 +2,33 @@ import torch
 import parameters
 import grid_generation as grid
 import total_variation_bound as tv
-import probability_mass_computation as proba
 
-from distributions import GaussianMixture
+from distributions import GaussianMixture, Gaussian, UniformMixture, Uniform
 
 
 def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, grid_type):
 
     tv_bounds = [0.0]
-    gmms = []
-
+    mixtures = []
 
     for t in range(parameters.n_steps_ahead + 1):
 
         if t == 0:
-            hat_gmm = initial_distribution
+            hat_mixture = initial_distribution
         else:
-            means_gmm = dynamics(signatures)
-            covs_noise = noise_distribution.covariance.unsqueeze(0).expand(means_gmm.size(0), -1, -1)
-            hat_gmm = GaussianMixture(means_gmm, covs_noise, double_hat_probs)
+            if isinstance(noise_distribution, Gaussian):
+                means_gmm = dynamics(signatures)
+                covs_noise = noise_distribution.covariance.unsqueeze(0).expand(means_gmm.size(0), -1, -1)
+                hat_mixture = GaussianMixture(means_gmm, covs_noise, double_hat_probs)
 
-        gmms.append(hat_gmm)
-        samples = hat_gmm(parameters.n_samples)
+            elif isinstance(noise_distribution, Uniform):
+                centers_gmm = dynamics(signatures)
+                lows_noise = noise_distribution.low.unsqueeze(0).expand(centers_gmm.size(0), -1)
+                highs_noise = noise_distribution.high.unsqueeze(0).expand(centers_gmm.size(0), -1)
+                hat_mixture = UniformMixture(centers=centers_gmm, lows=lows_noise, highs=highs_noise, weights=double_hat_probs)
+
+        mixtures.append(hat_mixture)
+        samples = hat_mixture(parameters.n_samples)
 
         if t < parameters.n_steps_ahead:
             high_prob_region = grid.identify_high_prob_region(samples)
@@ -32,7 +37,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, grid_
             regions = grid.create_regions(high_prob_region, samples, parameters.min_proportion, parameters.min_size, parameters.max_depth, 0, grid_type)
             signatures = grid.place_signatures(regions)
 
-            double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
+            double_hat_probs = hat_mixture.compute_regions_probabilities(regions) #TODO: Generalize for GMMs with different covariances
 
             regions, signatures = grid.add_unbounded_representations(regions, signatures, outer_signature)
 
@@ -45,7 +50,7 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, grid_
                 signatures = signatures[:-1]
                 regions, signatures = grid.refine_regions(regions, signatures, contributions, parameters.threshold)
 
-                double_hat_probs = proba.compute_signature_probabilities(hat_gmm.means, hat_gmm.covariances[0], hat_gmm.weights, regions) #TODO: Generalize for GMMs with different covariances
+                double_hat_probs = hat_mixture.compute_regions_probabilities(regions) #TODO: Generalize for GMMs with different covariances
                 regions, signatures = grid.add_unbounded_representations(regions, signatures, outer_signature)
 
                 tv_bound, contributions = tv.compute_upper_bound_for_TV(dynamics, noise_distribution, signatures, double_hat_probs, regions)
@@ -53,4 +58,4 @@ def tv_bound_algorithm(dynamics, initial_distribution, noise_distribution, grid_
 
             tv_bounds.append(tv_bound.item())
 
-    return torch.Tensor(tv_bounds), gmms
+    return torch.Tensor(tv_bounds), mixtures

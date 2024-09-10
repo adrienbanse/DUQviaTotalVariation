@@ -18,7 +18,7 @@ initial_covariances = torch.stack((cov, cov), dim=0)
 
 # Noise
 mean_noise = torch.Tensor([0, 0, 0])
-sigma_noise = 0.1
+sigma_noise = 1
 cov_noise = sigma_noise * torch.eye(3)  # Assumes uncorrelation (this could be relaxed in further upgrades)
 
 # Barrier (unsafe set)
@@ -35,13 +35,13 @@ if __name__ == "__main__":
 
     monte_carlo.monte_carlo_simulation(f, initial_distribution, noise_distribution, barrier, parameters.n_steps_ahead, parameters.n_samples)
 
-    tv_bounds_time_step, gmms = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, parameters.grid_type)
+    tv_bounds_time_step, mixtures = algorithm.tv_bound_algorithm(f, initial_distribution, noise_distribution, parameters.grid_type)
     tv_bounds = torch.cumsum(tv_bounds_time_step, dim=0)
     tv_bounds = torch.minimum(tv_bounds, torch.tensor(1))
     print(f"Final TV bounds: {tv_bounds}")
 
-    gmm_hitting_probs = monte_carlo.gmm_approximation_monte_carlo(gmms, barrier, parameters.n_samples)
-    print(f"GMM hitting probs: {gmm_hitting_probs}")
+    mixtures_hitting_probs = monte_carlo.mixture_approximation_monte_carlo(mixtures, barrier, parameters.n_samples)
+    print(f"Mixtures hitting probs: {mixtures_hitting_probs}")
 
 
 

@@ -1,10 +1,12 @@
 import torch
 import math
+from torch.special import erf
 import torch.linalg as linalg
 import grid_generation as grid
 from abc import ABC, abstractmethod
 
-from distributions import _Distributions
+from distributions import Gaussian, Uniform
+import probability_mass_computation as proba
 
 
 class _Dynamics(ABC):
@@ -16,7 +18,7 @@ class _Dynamics(ABC):
     def compute_hypercube_envelopes(self, regions: torch.Tensor):
         pass
 
-    def compute_envelopes_transform(self, distribution: _Distributions, signatures: torch.Tensor, envelopes: torch.Tensor):
+    def compute_envelopes_transform(self, distribution, signatures: torch.Tensor, envelopes: torch.Tensor):
 
         cov = distribution.covariance
         inv_cov = linalg.inv(cov)
@@ -34,6 +36,51 @@ class _Dynamics(ABC):
         max_values = torch.max(norms, dim=1).values  # Get the maximum value across the vertices
 
         return max_values / (2 * math.sqrt(2))
+
+    def compute_max_s(self, noise_distribution, regions, signatures):
+
+        if isinstance(noise_distribution, Gaussian):
+            envelopes = self.compute_hypercube_envelopes(regions)
+            transformed_envelopes = self.compute_envelopes_transform(noise_distribution, signatures, envelopes)
+            h = self.compute_h(transformed_envelopes)
+            max_values = erf(h)
+            max_values = torch.cat((max_values, torch.ones(1)), dim=0)
+
+            return max_values
+
+        elif isinstance(noise_distribution, Uniform):
+            propagated_signatures = self(signatures)
+            lows_extremities = propagated_signatures + noise_distribution.low
+            highs_extremities = propagated_signatures + noise_distribution.high
+
+
+            vertices = grid.get_vertices(regions)
+            #TODO: This only works for the linear dynamics
+            #TODO: In general, we should consider the point that makes f(x) as far as possible from f(signature)
+            selected_vertices = vertices[:, 0, :] #using symmetry of bounded regions
+            propagated_vertices = self(selected_vertices)
+            lows_extremities_vertices = propagated_vertices + noise_distribution.low
+            highs_extremities_vertices = propagated_vertices + noise_distribution.high
+
+
+            min_intersection = torch.max(lows_extremities, lows_extremities_vertices)
+            max_intersection = torch.min(highs_extremities, highs_extremities_vertices)
+            valid_intersection = (min_intersection <= max_intersection).all(dim=-1)
+            intersection_lengths = torch.clamp(max_intersection - min_intersection, min=0)
+            intersection_volume = intersection_lengths.prod(dim=-1)
+            intersection_volume = intersection_volume * valid_intersection.float()
+
+            support_size = highs_extremities - lows_extremities
+            area = support_size.prod(dim=-1)
+            height = 1 / area
+
+            max_values = 0.5 * (2 - 2 * intersection_volume * height)
+            max_values = torch.cat((max_values, torch.ones(1)), dim=0)
+
+            return max_values
+
+
+
 
 
 class LinearDynamics(_Dynamics):
@@ -121,16 +168,38 @@ class DubinsDynamics(_Dynamics):
 
         return torch.stack((component_1, component_2, component_3), dim=1)
 
+    def linear_approximation(self, x, type):
+
+        factor = 1
+        if type == "under":
+            factor = -1
+
+        # TODO: Check
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+
+        component_1 = x[:, 0] + self.h * self.v * factor
+        component_2 = x[:, 1] + self.h * self.v * factor
+        component_3 = x[:, 2] + self.h * self.u
+
+        return torch.stack((component_1, component_2, component_3), dim=1)
+
+
     def compute_hypercube_envelopes(self, regions):
-        #TODO: This is still a proxy; should consider non-linearity of sin and cos
+
         vertices = grid.get_vertices(regions)
 
         # TODO: Is there a better way to compute this below?
         n, d = vertices.shape[0], vertices.shape[-1]
-        propagated_vertices = torch.stack([self(vert) for vert in vertices.reshape(-1, d)]).reshape(n, 2 ** d, d)
+        propag_vertices_underapprox = (torch.stack(
+            [self.linear_approximation(vert, "under") for vert in vertices.reshape(-1, d)])
+                                       .reshape(n, 2 ** d, d))
+        propag_vertices_overapprox = (torch.stack(
+            [self.linear_approximation(vert, "over") for vert in vertices.reshape(-1, d)])
+                                      .reshape(n, 2 ** d, d))
 
-        min_vals, _ = torch.min(propagated_vertices, dim=1)
-        max_vals, _ = torch.max(propagated_vertices, dim=1)
+        min_vals, _ = torch.min(propag_vertices_underapprox, dim=1)
+        max_vals, _ = torch.max(propag_vertices_overapprox, dim=1)
 
         envelopes = torch.stack([min_vals, max_vals], dim=1)
         return envelopes
