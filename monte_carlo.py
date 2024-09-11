@@ -3,6 +3,8 @@ import barriers as barriers
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import probability_mass_computation as proba
+from distributions import GaussianMixture, UniformMixture
+
 
 def monte_carlo_simulation(dynamics, initial_distribution, noise_distribution, barrier, n_simulations, n_samples):
 
@@ -27,19 +29,19 @@ def monte_carlo_simulation(dynamics, initial_distribution, noise_distribution, b
         hitting_proba = barriers.hitting_probability(states, barrier)
         hitting_probas.append(hitting_proba)
 
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right', fontsize=15)
     plt.xlim(1, 9)
     plt.ylim(0, 11)
-    plt.xlabel('State[0]')
-    plt.ylabel('State[1]')
+    plt.xlabel('State[0]', fontsize=15)
+    plt.ylabel('State[1]', fontsize=15)
     plt.grid(True)
     plt.show()
 
     return hitting_probas
 
-def gmm_approximation_monte_carlo(gmms, barrier, n_samples):
+def mixture_approximation_monte_carlo(mixtures, barrier, n_samples):
 
-    gmm_hitting_probs = []
+    mixtures_hitting_probs = []
 
     fig, ax = plt.subplots()
 
@@ -47,25 +49,29 @@ def gmm_approximation_monte_carlo(gmms, barrier, n_samples):
                      edgecolor='red', facecolor='lightcoral', fill=True, lw=1, alpha=0.7, label='Unsafe set')
     ax.add_patch(rect)
 
-    for gmm in gmms:
+    for mixture in mixtures:
 
         # Compute hitting probability
-        proba_barrier = proba.gaussian_mixture_proba_mass_inside_hypercubes(gmm.means, gmm.covariances[0], gmm.weights, barrier.unsqueeze(0))
-        gmm_hitting_probs.append(proba_barrier.item())
+        if isinstance(mixture, GaussianMixture):
+            proba_barrier = proba.gaussian_mixture_proba_mass_inside_hypercubes(mixture.means, mixture.covariances[0], mixture.weights, barrier.unsqueeze(0))
+        elif isinstance(mixture, UniformMixture):
+            proba_barrier = proba.uniform_mixture_proba_mass_inside_hypercubes(mixture.centers + mixture.lows, mixture.centers + mixture.highs, mixture.weights, barrier.unsqueeze(0))
 
-        samples = gmm(n_samples)
+        mixtures_hitting_probs.append(proba_barrier.item())
+
+        samples = mixture(n_samples)
 
         #Plot
         plt.hist2d(samples[:, 0], samples[:, 1], bins=100, alpha=0.8, cmin=0.1)
 
 
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right', fontsize=15)
 
     plt.xlim(1, 9)
     plt.ylim(0, 11)
-    plt.xlabel('State[0]')
-    plt.ylabel('State[1]')
+    plt.xlabel('State[0]', fontsize=15)
+    plt.ylabel('State[1]', fontsize=15)
     plt.grid(True)
     plt.show()
 
-    return gmm_hitting_probs
+    return mixtures_hitting_probs

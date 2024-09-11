@@ -14,7 +14,7 @@ def timer_func(func):
  
  
 # ----------------------------------------------------------------------------------------- #
-# ------------------------ Gaussian probability mass inside hypercube --------------------- #
+# ----------------------------------- Gaussian Mixtures ----------------------------------- #
 # ----------------------------------------------------------------------------------------- #
  
 def erf_factor(means: torch.Tensor, covs: torch.Tensor, regions_min: torch.Tensor, regions_max: torch.Tensor):
@@ -54,17 +54,44 @@ def gaussian_mixture_proba_mass_inside_hypercubes(means, cov, weights, regions):
     proba_region = (weights * proba_segment).sum(dim=-1)
     
     return proba_region
- 
- 
-@timer_func
-def compute_signature_probabilities(means, cov, weights, regions):
 
-    signature_probas = gaussian_mixture_proba_mass_inside_hypercubes(means, cov, weights, regions)
 
-    # the remaining probability is attributed to the whole unbounded region
-    unbounded_proba = torch.Tensor([1 - signature_probas.sum()])
-    signature_probas = torch.cat((signature_probas, unbounded_proba))
+# ----------------------------------------------------------------------------------------- #
+# ----------------------------------- Uniform Mixtures ------------------------------------ #
+# ----------------------------------------------------------------------------------------- #
 
-    return signature_probas
+def compute_intersection(lows_extremities, highs_extremities, regions):
+
+    # Extract the min and max bounds for both sets of regions
+    min_n, max_n = regions[:, 0, :], regions[:, 1, :]
+    min_m, max_m = lows_extremities, highs_extremities
+
+    # Compute the intersection bounds
+    intersection_min = torch.max(min_n[:, None, :], min_m[None, :, :])
+    intersection_max = torch.min(max_n[:, None, :], max_m[None, :, :])
+
+    intersection_length = torch.clamp(intersection_max - intersection_min, min=0)
+    intersection_volume = intersection_length.prod(dim=-1)
+
+    return intersection_volume
+
+
+def uniform_proba_mass_inside_hypercubes(lows_extremities, highs_extremities, regions):
+
+    support_size = highs_extremities - lows_extremities
+    area = support_size.prod(dim=-1)
+    height = 1 / area
+
+    intersection_volume = compute_intersection(lows_extremities, highs_extremities, regions)
+
+    return intersection_volume * height
+
+def uniform_mixture_proba_mass_inside_hypercubes(lows_extremities, highs_extremities, weights, regions):
+
+    proba_segment = uniform_proba_mass_inside_hypercubes(lows_extremities, highs_extremities, regions)
+    proba_region = (weights * proba_segment).sum(dim=-1)
+
+    return proba_region
+
 
 
