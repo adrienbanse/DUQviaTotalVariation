@@ -22,7 +22,7 @@ initial_covariances = torch.stack((cov, cov), dim=0)
 
 # Noise
 mean_noise = torch.Tensor([0, 0, 0])
-sigma_noise = 1
+sigma_noise = 0.02
 cov_noise = sigma_noise * torch.eye(3)  # Assumes uncorrelation (this could be relaxed in further upgrades)
 
 # Barrier (unsafe set)
@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     torch.manual_seed(0) # for reproducibility
 
-    f = DubinsDynamics(h = 0.3, v = 0.1, u = 1/0.5)
+    f = DubinsDynamics(h = 0.3, v = 5.0, u = 1/0.5)
 
     initial_distribution = GaussianMixture(initial_means, initial_covariances, initial_weights)
     noise_distribution = Gaussian(mean_noise, cov_noise)

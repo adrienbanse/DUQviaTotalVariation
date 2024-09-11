@@ -168,38 +168,53 @@ class DubinsDynamics(_Dynamics):
 
         return torch.stack((component_1, component_2, component_3), dim=1)
 
-    def linear_approximation(self, x, type):
+    def compute_extrema(self, angles_low, angles_high):
 
-        factor = 1
-        if type == "under":
-            factor = -1
+        cos_low = torch.cos(angles_low)
+        cos_high = torch.cos(angles_high)
+        sin_low = torch.sin(angles_low)
+        sin_high = torch.sin(angles_high)
 
-        # TODO: Check
-        if x.dim() == 1:
-            x = x.unsqueeze(0)
+        # Find critical points in the interval where cos(x) and sin(x) may have extrema
+        critical_cos = (torch.floor(angles_low / math.pi) * math.pi).clamp(min=angles_low, max=angles_high)
+        critical_sin = (torch.floor((angles_low + math.pi/2) / math.pi) * math.pi - math.pi/2).clamp(min=angles_low, max=angles_high)
 
-        component_1 = x[:, 0] + self.h * self.v * factor
-        component_2 = x[:, 1] + self.h * self.v * factor
-        component_3 = x[:, 2] + self.h * self.u
+        # Compute cos and sin at critical points
+        cos_critical = torch.cos(critical_cos)
+        sin_critical = torch.sin(critical_sin)
 
-        return torch.stack((component_1, component_2, component_3), dim=1)
+        # Compute min/max cos and sin over the intervals
+        min_cos = torch.min(torch.stack([cos_low, cos_high, cos_critical]), dim=0)[0]
+        max_cos = torch.max(torch.stack([cos_low, cos_high, cos_critical]), dim=0)[0]
+        min_sin = torch.min(torch.stack([sin_low, sin_high, sin_critical]), dim=0)[0]
+        max_sin = torch.max(torch.stack([sin_low, sin_high, sin_critical]), dim=0)[0]
+
+        return min_cos, max_cos, min_sin, max_sin
 
 
     def compute_hypercube_envelopes(self, regions):
 
-        vertices = grid.get_vertices(regions)
+        angles_low = regions[:, 0, 2]
+        angles_high = regions[:, 1, 2]
+        min_cos, max_cos, min_sin, max_sin = self.compute_extrema(angles_low, angles_high)
 
-        # TODO: Is there a better way to compute this below?
-        n, d = vertices.shape[0], vertices.shape[-1]
-        propag_vertices_underapprox = (torch.stack(
-            [self.linear_approximation(vert, "under") for vert in vertices.reshape(-1, d)])
-                                       .reshape(n, 2 ** d, d))
-        propag_vertices_overapprox = (torch.stack(
-            [self.linear_approximation(vert, "over") for vert in vertices.reshape(-1, d)])
-                                      .reshape(n, 2 ** d, d))
+        x_low = regions[:, 0, 0]
+        x_high = regions[:, 1, 0]
 
-        min_vals, _ = torch.min(propag_vertices_underapprox, dim=1)
-        max_vals, _ = torch.max(propag_vertices_overapprox, dim=1)
+        y_low = regions[:, 0, 1]
+        y_high = regions[:, 1, 1]
+
+        min_first_component = x_low + self.h * self.v * min_sin
+        max_first_component = x_high + self.h * self.v * max_sin
+
+        min_second_component = y_low + self.h * self.v * min_cos
+        max_second_component = y_high + self.h * self.v * max_cos
+
+        min_third_component = angles_low + self.h * self.u
+        max_third_component = angles_high + self.h * self.u
+
+        min_vals = torch.stack([min_first_component, min_second_component, min_third_component], dim=1)
+        max_vals = torch.stack([max_first_component, max_second_component, max_third_component], dim=1)
 
         envelopes = torch.stack([min_vals, max_vals], dim=1)
         return envelopes
