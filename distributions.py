@@ -12,6 +12,10 @@ class _Distributions:
     def compute_regions_probabilities(self, regions: torch.Tensor):
         pass
 
+    @abstractmethod
+    def density(self, x: torch.Tensor):
+        pass
+
 
 class Gaussian(_Distributions):
     def __init__(self, mean: torch.Tensor, cov: torch.Tensor):
@@ -24,6 +28,10 @@ class Gaussian(_Distributions):
 
     def compute_regions_probabilities(self, regions):
         raise NotImplementedError("Not yet implemented")
+    
+    def density(self, x: torch.Tensor):
+        mvn = MultivariateNormal(loc=self.mean, covariance_matrix=self.covariance)
+        return torch.exp(mvn.log_prob(x))
 
 
 class GaussianMixture(_Distributions):
@@ -49,6 +57,12 @@ class GaussianMixture(_Distributions):
         signature_probas = torch.cat((signature_probas, unbounded_proba))
 
         return signature_probas
+    
+    def density(self, x: torch.Tensor):
+        gaussian_distributions = MultivariateNormal(self.means, self.covariances)
+        x = x.unsqueeze(0) if x.ndimension() == 1 else x
+        probas = torch.exp(gaussian_distributions.log_prob(x.unsqueeze(1))) 
+        return probas @ self.weights
 
 class Uniform(_Distributions):
     def __init__(self, center: torch.Tensor, low: torch.Tensor, high: torch.Tensor):
@@ -63,6 +77,9 @@ class Uniform(_Distributions):
         return samples
 
     def compute_regions_probabilities(self, regions):
+        raise NotImplementedError("Not yet implemented")
+
+    def density(self, x: torch.Tensor):
         raise NotImplementedError("Not yet implemented")
 
 class UniformMixture(_Distributions):
@@ -89,3 +106,6 @@ class UniformMixture(_Distributions):
         signature_probas = torch.cat((signature_probas, unbounded_proba))
 
         return signature_probas
+    
+    def density(self, x: torch.Tensor):
+        raise NotImplementedError("Not yet implemented")
