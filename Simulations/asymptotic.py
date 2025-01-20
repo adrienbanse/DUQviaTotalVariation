@@ -26,25 +26,22 @@ mean_noise = torch.Tensor([0, 0])
 sigma_noise = 0.03
 cov_noise = sigma_noise * torch.eye(2)
 
-regions = torch.Tensor([
-    [ # 1
-        [-1, 0], 
-        [0, 1]
-    ], 
-    [ # 2
-        [0, 0], 
-        [1, 1]
-    ], 
-    [ # 3
-        [-1, -1], 
-        [0, 0]
-    ],
-    [ # 4
-        [0, -1], 
-        [1, 0]
-    ]
-])
+# TODO: To include in the codesource maybe
+def generate_uniform_partitions(n):
+    step = 2 / n  # Step size for partitioning along each axis
+    regions = []
+    for i in range(n):
+        for j in range(n):
+            # Calculate corners
+            xmin, ymin = -1 + i * step, -1 + j * step
+            xmax, ymax = -1 + (i + 1) * step, -1 + (j + 1) * step
+            regions.append([[xmin, ymin], [xmax, ymax]])
 
+    return torch.tensor(regions)
+
+# Generates 2^n u
+n = 3
+regions = generate_uniform_partitions(n)
 
 if __name__ == "__main__":
     torch.manual_seed(0) 
@@ -67,7 +64,7 @@ if __name__ == "__main__":
     means_gmm = f(signatures)
     tv_approx_list = []
 
-    for t in range(1, 100):
+    for t in range(1, 50):
         # Update true current
         cov_current = torch.matmul(torch.t(A), current_distribution.covariances[0, :, :])
         cov_current = torch.matmul(cov_current, A) + noise_distribution.covariance
