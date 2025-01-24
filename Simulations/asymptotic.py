@@ -36,11 +36,10 @@ def generate_uniform_partitions(n):
             xmin, ymin = -1 + i * step, -1 + j * step
             xmax, ymax = -1 + (i + 1) * step, -1 + (j + 1) * step
             regions.append([[xmin, ymin], [xmax, ymax]])
-
     return torch.tensor(regions)
 
-# Generates 2^n u
-n = 3
+n = 5
+# Generates 2^n cells
 regions = generate_uniform_partitions(n)
 
 if __name__ == "__main__":
@@ -64,10 +63,10 @@ if __name__ == "__main__":
     means_gmm = f(signatures)
     tv_approx_list = []
 
-    for t in range(1, 50):
+    for t in range(1, 100):
         # Update true current
-        cov_current = torch.matmul(torch.t(A), current_distribution.covariances[0, :, :])
-        cov_current = torch.matmul(cov_current, A) + noise_distribution.covariance
+        cov_current = torch.matmul(A, current_distribution.covariances[0, :, :])
+        cov_current = torch.matmul(cov_current, torch.t(A)) + noise_distribution.covariance
         mean_current = torch.matmul(A, current_distribution.means[0, :]) + noise_distribution.mean
         current_distribution = GaussianMixture(mean_current.unsqueeze(0), cov_current.unsqueeze(0), torch.Tensor([1]))
 
